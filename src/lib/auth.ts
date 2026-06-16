@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 const SECRET = process.env.AUTH_SECRET || "dev-insecure-secret-change-me";
 const COOKIE = "bj_admin";
@@ -49,6 +50,13 @@ export async function setSession(username: string) {
 export async function clearSession() {
   const c = await cookies();
   c.delete(COOKIE);
+}
+
+/** 보호된 관리자 페이지 상단에서 호출 — 미인증 시 로그인으로 리다이렉트 */
+export async function requireAdmin(): Promise<{ u: string }> {
+  const s = await getSession();
+  if (!s) redirect("/admin/login");
+  return s;
 }
 
 /** 관리자 로그인 검증 (env 자격증명). 미설정 시 로그인 불가(안전). */
