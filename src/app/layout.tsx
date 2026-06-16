@@ -4,6 +4,9 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SITE } from "@/lib/site";
 
+// 프리뷰(vercel.app) 색인 방지 — 본 도메인 컷오버 시 NEXT_PUBLIC_ALLOW_INDEX=true 로 색인 허용
+const allowIndex = process.env.NEXT_PUBLIC_ALLOW_INDEX === "true";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
@@ -18,7 +21,7 @@ export const metadata: Metadata = {
     locale: "ko_KR",
     url: SITE.url,
   },
-  robots: { index: true, follow: true },
+  robots: { index: allowIndex, follow: allowIndex },
 };
 
 export default function RootLayout({
