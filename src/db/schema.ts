@@ -17,7 +17,7 @@ import {
 export const articles = mysqlTable(
   "articles",
   {
-    id: int("id").primaryKey(), // = 그누보드 wr_id (보존)
+    id: int("id").autoincrement().primaryKey(), // 그누보드 wr_id 보존(명시삽입), 신규는 자동증가
     board: varchar("board", { length: 32 }).notNull().default("news"),
     title: varchar("title", { length: 500 }).notNull(),
     subtitle: varchar("subtitle", { length: 500 }),
