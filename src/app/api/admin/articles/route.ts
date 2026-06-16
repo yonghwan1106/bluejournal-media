@@ -2,6 +2,7 @@
 // 인증: Authorization: Bearer <NEWS_API_KEY>
 // 기존 Playwright /adm 폼 대신 JSON POST 한 번으로 발행.
 import { adminCreateArticle, dbConfigured } from "@/lib/admin-db";
+import { kstInputToDate } from "@/lib/format";
 
 export const runtime = "nodejs";
 
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
     tags: Array.isArray(b.tags) ? (b.tags as string[]) : [],
     viewCount: 0,
     status: (s("status") as "published" | "draft" | "hidden") ?? "published",
-    publishedAt: s("publishedAt") ? new Date(s("publishedAt")!) : new Date(),
+    publishedAt: s("publishedAt") ? kstInputToDate(s("publishedAt")!) : new Date(),
   });
 
   const base = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");

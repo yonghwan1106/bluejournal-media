@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# 경인블루저널 Vultr VPS DB 셋업 (Ubuntu 24.04)
+# ──────────────────────────────────────────────────────────────────────────
+# ⚠️ DEPRECATED (2026-06): 사용하지 마세요.
+#   DB 경로를 Vultr VPS + MySQL → Neon(서버리스 Postgres) 로 교체했습니다.
+#   Neon 절차는 infra/RUNBOOK.md 4~6단계 참고. 이 스크립트는 기록용으로만 남겨둠.
+# ──────────────────────────────────────────────────────────────────────────
+# (구) 경인블루저널 Vultr VPS DB 셋업 (Ubuntu 24.04)
 # MySQL 8 + ProxySQL(커넥션 풀) + UFW + 일일백업(→R2)
-# 사용: root 로 실행. 생성된 DB 비밀번호를 안전히 보관할 것.
+echo "DEPRECATED: Neon 으로 전환됨. infra/RUNBOOK.md 4~6단계를 사용하세요." >&2
+exit 1
 set -euo pipefail
 
 # ───── 설정값 (필요시 수정) ─────

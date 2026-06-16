@@ -8,6 +8,7 @@ import {
   adminUpdateArticle,
   adminDeleteArticle,
 } from "@/lib/admin-db";
+import { kstInputToDate } from "@/lib/format";
 import type { NewArticle } from "@/db/schema";
 
 export async function loginAction(formData: FormData) {
@@ -53,7 +54,8 @@ function parseForm(fd: FormData): Omit<NewArticle, "id"> {
     tags,
     viewCount: 0,
     status: (str("status") as "published" | "draft" | "hidden") ?? "draft",
-    publishedAt: pub ? new Date(pub) : new Date(),
+    // datetime-local 값은 KST 벽시계 → 정확한 instant 로 변환
+    publishedAt: pub ? kstInputToDate(pub) : new Date(),
   };
 }
 

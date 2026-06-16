@@ -25,8 +25,8 @@ export type SeedArticle = {
 
 /**
  * 데이터 소스.
- * 현재: seed/articles.json (Vultr MySQL 구축 전 라이브 프리뷰용).
- * 이후: DATABASE_URL 존재 시 Drizzle/MySQL 질의로 교체 (src/db).
+ * 현재: seed/articles.json (Neon 적재 전 라이브 프리뷰용).
+ * 이후: DATABASE_URL 존재 시 Drizzle/Neon(Postgres) 질의로 교체 (src/db).
  */
 let cache: SeedArticle[] | null = null;
 

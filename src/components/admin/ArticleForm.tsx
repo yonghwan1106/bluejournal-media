@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import type { Article } from "@/db/schema";
-
-const pad = (n: number) => String(n).padStart(2, "0");
-function toLocalInput(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+import { toKstInput } from "@/lib/format";
 
 const field = "w-full rounded-md border border-line px-3 py-2 outline-none focus:border-brand";
 const labelCls = "block text-sm font-bold mb-1";
@@ -103,7 +99,7 @@ export function ArticleForm({
         </div>
         <div>
           <label className={labelCls}>등록일시</label>
-          <input type="datetime-local" name="publishedAt" defaultValue={toLocalInput(pubDate)} className={field} />
+          <input type="datetime-local" name="publishedAt" defaultValue={toKstInput(pubDate)} className={field} />
         </div>
       </div>
 
