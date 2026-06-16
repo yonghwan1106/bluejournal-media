@@ -64,13 +64,20 @@ bash bluejournal-web/infra/upload-to-r2.sh
 
 > Neon 무료 플랜: 자동 백업(PITR)·보안패치·풀링 내장 → 별도 백업 스크립트/VPS 운영 불필요.
 
-## 5. ✅→🙋 스키마 생성 + 시드 적재 (Neon)
+## 5. ✅ 스키마 생성 + 시드 적재 (Neon) — **완료(2026-06-17)**
 ```bash
 cd C:/Users/user/bluejournal-web
-# .env 에 DATABASE_URL=postgresql://...-pooler...neon.tech/...?sslmode=require 설정 후
-npx drizzle-kit push          # 스키마(articles, enum 타입 등) 생성
-node infra/load-seed.mjs      # seed/articles.json → Neon 663건 적재 + id 시퀀스 동기화
+# .env 에 DATABASE_URL(pooled) + DATABASE_URL_UNPOOLED(직결) 설정 후
+
+# (A) 비대화형 경로 — CI/어시스턴트/스크립트 환경 권장 (drizzle-kit push 는 TTY 필요)
+npx drizzle-kit generate                                   # drizzle/*.sql DDL 생성
+DATABASE_URL="$DATABASE_URL_UNPOOLED" node infra/apply-schema.mjs   # neon http 로 DDL 적용(직결)
+node --env-file=.env infra/load-seed.mjs                   # 663건 적재 + 시퀀스 동기화
+
+# (B) 대화형 터미널이면 (A)의 generate+apply 대신 push 한 줄로도 가능:
+#   DATABASE_URL="$DATABASE_URL_UNPOOLED" npx drizzle-kit push
 ```
+- ✅실적재 완료: 663건(id 188~871), 시퀀스 last_value=871 동기화(신규 발행 id=872~), 타임스탬프 instant 무드리프트, status/tags 정상.
 - 663건 모두 적재됨(그중 publishedAt 보유 658건, 나머지 5건은 등록일시 없이 적재).
 - `load-seed.mjs` 는 `ON CONFLICT(id) DO UPDATE` 라 **여러 번 실행해도 안전**(델타 재적재 가능).
 - 과도하게 긴 varchar 값(예: 잘못 유입된 출처)은 컬럼 길이에 맞춰 자동 절단(경고 출력).
