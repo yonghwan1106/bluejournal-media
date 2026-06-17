@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Article } from "@/db/schema";
 import { toKstInput } from "@/lib/format";
+import { RichEditor } from "./RichEditor";
 
 const field = "w-full rounded-md border border-line px-3 py-2 outline-none focus:border-brand";
 const labelCls = "block text-sm font-bold mb-1";
@@ -17,6 +18,7 @@ export function ArticleForm({
   const [thumb, setThumb] = useState(article?.thumbnailUrl ?? "");
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
+  const [body, setBody] = useState(article?.bodyHtml ?? "");
 
   const pubDate = article?.publishedAt ? new Date(article.publishedAt) : new Date();
 
@@ -119,8 +121,9 @@ export function ArticleForm({
       </div>
 
       <div>
-        <label className={labelCls}>본문 (HTML)</label>
-        <textarea name="bodyHtml" rows={18} defaultValue={article?.bodyHtml ?? ""} className={`${field} font-mono text-sm`} />
+        <label className={labelCls}>본문</label>
+        <RichEditor initialHTML={article?.bodyHtml ?? ""} onChange={setBody} />
+        <input type="hidden" name="bodyHtml" value={body} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
