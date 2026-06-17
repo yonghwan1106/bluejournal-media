@@ -119,5 +119,22 @@ export async function deleteArticleAction(id: number) {
     redirect(`/admin/articles/${id}/edit?error=delete`);
   }
   revalidatePublic(id);
-  redirect("/admin");
+  redirect("/admin?deleted=1");
+}
+
+/** 목록에서 발행/숨김 즉시 토글. returnTo 로 현재 필터·페이지를 보존한다. */
+export async function setStatusAction(formData: FormData) {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const status = normStatus(formData.get("status"), "draft");
+  const returnTo = String(formData.get("returnTo") || "/admin");
+  if (Number.isFinite(id)) {
+    try {
+      await adminUpdateArticle(id, { status });
+      revalidatePublic(id);
+    } catch (e) {
+      console.error("[admin] 상태 변경 실패:", e);
+    }
+  }
+  redirect(returnTo);
 }

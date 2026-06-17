@@ -4,17 +4,24 @@ import { requireAdmin } from "@/lib/auth";
 import { dbConfigured, adminGetArticle } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
 import { ArticleForm } from "@/components/admin/ArticleForm";
+import { Toast } from "@/components/admin/Toast";
 import { updateArticleAction, deleteArticleAction } from "../../../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "기사 편집" };
+
+const ERR: Record<string, string> = {
+  title: "제목을 입력하세요.",
+  save: "저장 중 오류가 발생했습니다.",
+  delete: "삭제 중 오류가 발생했습니다.",
+};
 
 export default async function EditArticlePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
   await requireAdmin();
   if (!dbConfigured()) return <NoDbNotice />;
@@ -29,6 +36,10 @@ export default async function EditArticlePage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
+      {sp.saved && <Toast message="저장되었습니다." />}
+      {sp.error && (
+        <Toast type="error" message={ERR[sp.error] ?? "오류가 발생했습니다."} />
+      )}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">기사 편집 #{a.id}</h1>
         {a.status === "published" ? (
@@ -43,11 +54,6 @@ export default async function EditArticlePage({
           <span className="text-sm text-muted">미게시(공개 미리보기 불가)</span>
         )}
       </div>
-      {sp.saved && (
-        <p className="mb-4 rounded bg-green-50 p-2 text-sm text-green-700">
-          저장되었습니다.
-        </p>
-      )}
       <ArticleForm article={a} action={update} />
       <form action={del} className="mt-10 border-t border-line pt-4">
         <button className="text-sm text-accent hover:underline">
