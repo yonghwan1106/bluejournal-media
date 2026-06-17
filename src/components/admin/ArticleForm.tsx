@@ -19,6 +19,7 @@ export function ArticleForm({
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
   const [body, setBody] = useState(article?.bodyHtml ?? "");
+  const storageKey = article ? String(article.id) : "new";
 
   const pubDate = article?.publishedAt ? new Date(article.publishedAt) : new Date();
 
@@ -46,7 +47,17 @@ export function ArticleForm({
   }
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      action={action}
+      onSubmit={() => {
+        try {
+          localStorage.removeItem(`bj_draft_${storageKey}`);
+        } catch {
+          /* 무시 */
+        }
+      }}
+      className="space-y-5"
+    >
       <div>
         <label className={labelCls}>제목 *</label>
         <input name="title" required defaultValue={article?.title ?? ""} className={field} />
@@ -122,7 +133,11 @@ export function ArticleForm({
 
       <div>
         <label className={labelCls}>본문</label>
-        <RichEditor initialHTML={article?.bodyHtml ?? ""} onChange={setBody} />
+        <RichEditor
+          initialHTML={article?.bodyHtml ?? ""}
+          onChange={setBody}
+          storageKey={storageKey}
+        />
         <input type="hidden" name="bodyHtml" value={body} />
       </div>
 
