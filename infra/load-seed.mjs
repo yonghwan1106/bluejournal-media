@@ -75,7 +75,8 @@ for (let i = 0; i < rows.length; i += BATCH) {
     `ON CONFLICT (id) DO UPDATE SET ` +
     `title=EXCLUDED.title, body_html=EXCLUDED.body_html, ` +
     `subtitle=EXCLUDED.subtitle, thumbnail_url=EXCLUDED.thumbnail_url, ` +
-    `tags=EXCLUDED.tags, published_at=EXCLUDED.published_at`;
+    `tags=EXCLUDED.tags, published_at=EXCLUDED.published_at, ` +
+    `section=EXCLUDED.section, region=EXCLUDED.region`;
   await sql.query(text, values);
   done += chunk.length;
   process.stdout.write(`\r적재 ${done}/${rows.length}`);

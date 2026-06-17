@@ -24,8 +24,7 @@ export const SITE = {
 export const NAV = [
   { label: "뉴스", href: "/section/뉴스" },
   { label: "특집", href: "/section/특집" },
-  { label: "지역뉴스", href: "/section/지역뉴스" },
+  { label: "탐사문학", href: "/section/탐사문학" },
   { label: "경기", href: "/region/경기" },
-  { label: "서울", href: "/region/서울" },
   { label: "인천", href: "/region/인천" },
 ] as const;

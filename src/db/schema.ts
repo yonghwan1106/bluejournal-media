@@ -44,9 +44,9 @@ export const articles = pgTable(
     subtitle: varchar("subtitle", { length: 500 }),
     reporterName: varchar("reporter_name", { length: 100 }),
     reporterEmail: varchar("reporter_email", { length: 200 }),
-    // 1차 섹션: 뉴스 / 특집 / 지역뉴스
+    // 섹션: 뉴스 / 특집 / 탐사문학
     section: varchar("section", { length: 50 }).notNull().default("뉴스"),
-    // 2차 섹션(지역뉴스 하위): 경기 / 서울 / 인천
+    // 지역: 경기 / 인천 (경인 매체 — 서울 제외)
     region: varchar("region", { length: 50 }),
     // 메인 출력영역: 헤드라인 / 주요뉴스 / 중앙섹션 / 우측섹션
     displaySlot: varchar("display_slot", { length: 50 }),

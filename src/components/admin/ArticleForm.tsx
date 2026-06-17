@@ -60,7 +60,7 @@ export function ArticleForm({
           <select name="section" defaultValue={article?.section ?? "뉴스"} className={field}>
             <option>뉴스</option>
             <option>특집</option>
-            <option>지역뉴스</option>
+            <option>탐사문학</option>
           </select>
         </div>
         <div>
@@ -68,7 +68,6 @@ export function ArticleForm({
           <select name="region" defaultValue={article?.region ?? ""} className={field}>
             <option value="">(없음)</option>
             <option>경기</option>
-            <option>서울</option>
             <option>인천</option>
           </select>
         </div>

@@ -23,10 +23,9 @@ export default async function Home() {
   const headline = top[0];
   const sub = top.slice(1, 5); // 주요뉴스
   const latest = top.slice(5, 17); // 최신
-  const [gyeonggi, seoul, incheon] = await Promise.all([
-    getByRegion("경기", 6),
-    getByRegion("서울", 5),
-    getByRegion("인천", 5),
+  const [gyeonggi, incheon] = await Promise.all([
+    getByRegion("경기", 8),
+    getByRegion("인천", 8),
   ]);
 
   return (
@@ -56,21 +55,13 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 지역뉴스 3열 */}
-      <section className="mt-12 grid gap-8 md:grid-cols-3">
+      {/* 지역뉴스 2열 (경기·인천) */}
+      <section className="mt-12 grid gap-8 md:grid-cols-2">
         <div>
           <SectionTitle title="경기" href="/region/경기" />
           {gyeonggi.map((a) => (
             <ArticleCard key={a.id} a={a} variant="compact" />
           ))}
-        </div>
-        <div>
-          <SectionTitle title="서울" href="/region/서울" />
-          {seoul.length ? (
-            seoul.map((a) => <ArticleCard key={a.id} a={a} variant="compact" />)
-          ) : (
-            <p className="py-4 text-sm text-muted">등록된 기사가 없습니다.</p>
-          )}
         </div>
         <div>
           <SectionTitle title="인천" href="/region/인천" />
