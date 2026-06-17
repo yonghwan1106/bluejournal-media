@@ -7,6 +7,7 @@ import {
   count,
   isNull,
   isNotNull,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -71,6 +72,7 @@ export async function adminStats(): Promise<{
   draft: number;
   hidden: number;
   trash: number;
+  totalViews: number;
 }> {
   const db = getDb();
   const rows = await db
@@ -78,7 +80,7 @@ export async function adminStats(): Promise<{
     .from(articles)
     .where(isNull(articles.deletedAt))
     .groupBy(articles.status);
-  const m = { total: 0, published: 0, draft: 0, hidden: 0, trash: 0 };
+  const m = { total: 0, published: 0, draft: 0, hidden: 0, trash: 0, totalViews: 0 };
   for (const r of rows) {
     const n = Number(r.c);
     m.total += n;
@@ -91,7 +93,28 @@ export async function adminStats(): Promise<{
     .from(articles)
     .where(isNotNull(articles.deletedAt));
   m.trash = Number(c);
+  const [{ v }] = await db
+    .select({ v: sql<number>`coalesce(sum(${articles.viewCount}), 0)::int` })
+    .from(articles)
+    .where(isNull(articles.deletedAt));
+  m.totalViews = Number(v);
   return m;
+}
+
+/** 조회수 상위 기사(휴지통 제외). */
+export async function adminTopViewed(
+  limit = 5,
+): Promise<{ id: number; title: string; viewCount: number }[]> {
+  return getDb()
+    .select({
+      id: articles.id,
+      title: articles.title,
+      viewCount: articles.viewCount,
+    })
+    .from(articles)
+    .where(isNull(articles.deletedAt))
+    .orderBy(desc(articles.viewCount))
+    .limit(limit);
 }
 
 export async function adminGetArticle(id: number): Promise<Article | null> {

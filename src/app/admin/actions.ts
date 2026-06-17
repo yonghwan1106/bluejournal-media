@@ -76,7 +76,7 @@ function parseForm(fd: FormData): Omit<NewArticle, "id"> {
     source: str("source"),
     sourceUrl: str("sourceUrl"),
     tags,
-    viewCount: 0,
+    // viewCount 는 의도적으로 제외 — 수정 시 0으로 덮어쓰지 않도록(신규는 스키마 default 0).
     status: normStatus(str("status"), "draft"),
     // datetime-local 값은 KST 벽시계 → 정확한 instant 로 변환
     publishedAt: pub ? kstInputToDate(pub) : new Date(),

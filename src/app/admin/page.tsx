@@ -4,6 +4,7 @@ import {
   dbConfigured,
   adminListArticles,
   adminStats,
+  adminTopViewed,
   type ArticleStatus,
 } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
@@ -88,6 +89,7 @@ export default async function AdminHome({
     }),
     adminStats(),
   ]);
+  const top = trash ? [] : await adminTopViewed(5);
 
   const filter = { q, status, section, region };
   const returnTo = buildQs({ ...filter, page, trash });
@@ -148,6 +150,30 @@ export default async function AdminHome({
             ))}
           </div>
 
+          {top.length > 0 && top[0].viewCount > 0 && (
+            <div className="mt-4 rounded-lg border border-line p-4">
+              <div className="mb-2 text-xs font-bold text-muted">🔥 조회수 상위</div>
+              <ol className="space-y-1 text-sm">
+                {top
+                  .filter((t) => t.viewCount > 0)
+                  .map((t, i) => (
+                    <li key={t.id} className="flex items-center justify-between gap-3">
+                      <Link
+                        href={`/admin/articles/${t.id}/edit`}
+                        className="truncate hover:text-brand"
+                      >
+                        <span className="mr-2 text-muted">{i + 1}.</span>
+                        {t.title}
+                      </Link>
+                      <span className="shrink-0 font-semibold text-ink">
+                        {t.viewCount.toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+              </ol>
+            </div>
+          )}
+
           <form
             method="GET"
             action="/admin"
@@ -201,6 +227,12 @@ export default async function AdminHome({
         <p className="text-sm text-muted">
           총 <strong className="text-ink">{total}</strong>건
           {!trash && (q || status || section || region) && " (필터 적용됨)"}
+          {!trash && (
+            <>
+              {" · "}조회 합계{" "}
+              <strong className="text-ink">{stats.totalViews.toLocaleString()}</strong>
+            </>
+          )}
         </p>
         {!trash && (
           <Link href="/admin?trash=1" className="text-sm text-muted hover:text-ink">
@@ -218,13 +250,14 @@ export default async function AdminHome({
               <th className="px-2 py-2">섹션·지역</th>
               <th className="px-2 py-2">상태</th>
               <th className="px-2 py-2">등록일</th>
+              <th className="px-2 py-2 text-right">조회</th>
               <th className="px-2 py-2 text-right">작업</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-2 py-10 text-center text-muted">
+                <td colSpan={7} className="px-2 py-10 text-center text-muted">
                   {trash ? "휴지통이 비어 있습니다." : "조건에 맞는 기사가 없습니다."}
                 </td>
               </tr>
@@ -259,6 +292,9 @@ export default async function AdminHome({
                 </td>
                 <td className="px-2 py-2 text-muted">
                   {formatDate(a.publishedAt ? new Date(a.publishedAt).toISOString() : null)}
+                </td>
+                <td className="px-2 py-2 text-right text-muted">
+                  {a.viewCount.toLocaleString()}
                 </td>
                 <td className="px-2 py-2">
                   {trash ? (

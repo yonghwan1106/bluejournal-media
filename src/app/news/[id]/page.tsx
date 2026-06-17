@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getArticle, getAllIds, getRelated } from "@/lib/articles";
 import { rewriteBodyImages, resolveImg } from "@/lib/media";
 import { sanitizeBodyHtml } from "@/lib/sanitize";
+import { ViewBeacon } from "@/components/ViewBeacon";
 import { formatDateTime } from "@/lib/format";
 import { ArticleCard } from "@/components/ArticleCard";
 
@@ -54,6 +55,7 @@ export default async function ArticlePage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
+      <ViewBeacon id={a.id} />
       <nav className="text-xs text-muted">
         <Link href="/" className="hover:text-brand">
           홈
