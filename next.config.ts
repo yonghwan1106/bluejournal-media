@@ -15,14 +15,14 @@ const nextConfig: NextConfig = {
           { type: "query", key: "wr_id", value: "(?<id>\\d+)" },
         ],
         destination: "/news/:id",
-        permanent: true,
+        statusCode: 301,
       },
       // print 등 부가 레거시 → 기사 본문으로
       {
         source: "/bbs/print.php",
         has: [{ type: "query", key: "wr_id", value: "(?<id>\\d+)" }],
         destination: "/news/:id",
-        permanent: true,
+        statusCode: 301,
       },
     ];
   },

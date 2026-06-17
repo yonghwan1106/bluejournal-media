@@ -102,13 +102,23 @@ NEXT_PUBLIC_ALLOW_INDEX = true   # 본 도메인 컷오버 후에만
 ```
 → 재배포하면 데이터는 Neon, 이미지는 R2에서 서빙.
 
-## 7. 🙋 무중단 컷오버 (가비아 도메인 + Cloudflare)
-1. Cloudflare DNS에서 `bluejournal.co.kr`, `www` 레코드 **TTL을 60초로 낮춰** 24시간 대기
-2. 컷오버 시점: 자동화 봇 일시정지 → 최종 기사 델타 재크롤/적재(`load-seed.mjs` 재실행)
-3. Cloudflare DNS A/CNAME을 **넷프로 IP → Vercel** 로 변경 (Vercel 도메인 추가 후 안내되는 값)
-4. Vercel에서 `bluejournal.co.kr` 커스텀 도메인 추가 + SSL 발급 확인
-5. 레거시 `board.php?wr_id=N` → `/news/N` 301 동작 확인(이미 next.config에 구현)
-6. 네이버 서치어드바이저·구글 서치콘솔 사이트 재등록 + sitemap 제출
+## 7. 무중단 컷오버 (가비아 NS → Cloudflare → Vercel) — **진행 중(2026-06-17)**
+DNS 관리권이 넷프로(`ns1.netproserver.com`)에 있어, 가비아에서 네임서버를 Cloudflare로 옮긴다.
+순서가 핵심: **레코드 사전 등록 → Vercel 도메인 추가 → 가비아 NS 변경**(전파 중 구·신 사이트 동시 동작 = 무중단).
+
+1. ✅ Cloudflare에 zone `bluejournal.co.kr` 추가(Free, 계정 Sanoramyun8) → 배정 NS: `benedict.ns.cloudflare.com` / `kira.ns.cloudflare.com`
+2. ✅ Cloudflare DNS에 Vercel 레코드 2개(**회색 구름 = DNS only**, Vercel 표시값 그대로):
+   - `A      @(bluejournal.co.kr) → 216.150.1.1`
+   - `CNAME  www → 6fe58dc704273fb9.vercel-dns-016.com`  (이 도메인 전용 고유값)
+   - 옛 넷프로 레코드 5개(apex/www/ns1/ns2 A + 와일드카드 CNAME) 삭제, MX 없음(이메일 미사용)
+   - ⚠️ Vercel 레코드는 **반드시 회색 구름** — 주황(프록시)이면 Vercel SSL 발급 충돌
+3. ✅ Vercel(bluejournal-media)에 `bluejournal.co.kr` + `www.bluejournal.co.kr` 추가, **www 대표**(.vercel.app → 307 → www)
+4. ✅ 가비아 네임서버 변경: `ns1/ns2.netproserver.com` → `benedict/kira.ns.cloudflare.com` (설정 완료, 전파 대기)
+5. ⏳ 전파 확인: `nslookup -type=NS bluejournal.co.kr 8.8.8.8` 가 cloudflare 반환 → Cloudflare zone "활성" + Vercel 도메인 "Valid"(SSL 자동 발급)
+6. 🙋 전파 후 env + 재배포: `NEXT_PUBLIC_SITE_URL=https://www.bluejournal.co.kr`, `NEXT_PUBLIC_ALLOW_INDEX=true`(색인 허용)
+7. 🙋 R2 커스텀 도메인: Cloudflare R2 → 버킷 Settings → Custom Domains → `media.bluejournal.co.kr` → env `NEXT_PUBLIC_MEDIA_BASE`/`R2_PUBLIC_BASE` 교체(r2.dev → media)
+8. 검증: `https://www.bluejournal.co.kr` 200·SSL·보안헤더, 레거시 `board.php?wr_id=N → /news/N` **301**
+9. 🙋 네이버 서치어드바이저·구글 서치콘솔 재등록 + `https://www.bluejournal.co.kr/sitemap.xml` 제출
 
 ## 8. 컷오버 후
 - 넷프로 해지 **전** 최소 1~2주 병행 운영하며 색인·제휴 모니터링
