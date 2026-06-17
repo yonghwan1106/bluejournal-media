@@ -9,6 +9,8 @@ import {
   adminDeleteArticle,
   adminRestoreArticle,
   adminPurgeArticle,
+  saveRevision,
+  restoreRevision,
 } from "@/lib/admin-db";
 import { kstInputToDate } from "@/lib/format";
 import type { NewArticle } from "@/db/schema";
@@ -103,6 +105,11 @@ export async function updateArticleAction(id: number, formData: FormData) {
   const data = parseForm(formData);
   if (!data.title) redirect(`/admin/articles/${id}/edit?error=title`);
   try {
+    await saveRevision(id); // 저장 직전 상태를 이력으로(베스트 에포트)
+  } catch (e) {
+    console.error("[admin] 이력 저장 실패:", e);
+  }
+  try {
     await adminUpdateArticle(id, data);
   } catch (e) {
     console.error("[admin] 기사 수정 실패:", e);
@@ -170,4 +177,21 @@ export async function purgeArticleAction(formData: FormData) {
     }
   }
   redirect(returnTo);
+}
+
+/** 특정 이력 버전으로 되돌리기(현재 상태도 이력에 저장됨). */
+export async function restoreRevisionAction(formData: FormData) {
+  await requireAdmin();
+  const articleId = Number(formData.get("articleId"));
+  const revId = Number(formData.get("revId"));
+  if (Number.isFinite(articleId) && Number.isFinite(revId)) {
+    try {
+      await restoreRevision(articleId, revId);
+      revalidatePublic(articleId);
+    } catch (e) {
+      console.error("[admin] 되돌리기 실패:", e);
+      redirect(`/admin/articles/${articleId}/edit?error=save`);
+    }
+  }
+  redirect(`/admin/articles/${articleId}/edit?saved=1`);
 }

@@ -144,5 +144,18 @@ export const mediaMap = pgTable(
   (t) => [index("oldpath_idx").on(t.oldPath)],
 );
 
+/** 기사 수정 이력(버전) — 저장 직전 상태를 jsonb 스냅샷으로 보관, 되돌리기 지원. */
+export const articleRevisions = pgTable(
+  "article_revisions",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    articleId: integer("article_id").notNull(),
+    title: varchar("title", { length: 500 }),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+    createdAt: ts("created_at").defaultNow(),
+  },
+  (t) => [index("rev_article_idx").on(t.articleId)],
+);
+
 export type Article = typeof articles.$inferSelect;
 export type NewArticle = typeof articles.$inferInsert;

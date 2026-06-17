@@ -15,6 +15,13 @@
       "when": 1781696433197,
       "tag": "0001_brief_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781698127379,
+      "tag": "0002_spicy_spot",
+      "breakpoints": true
     }
   ]
 }

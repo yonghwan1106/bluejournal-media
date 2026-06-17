@@ -11,7 +11,12 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { getDb } from "@/db";
-import { articles, type NewArticle, type Article } from "@/db/schema";
+import {
+  articles,
+  articleRevisions,
+  type NewArticle,
+  type Article,
+} from "@/db/schema";
 
 export function dbConfigured(): boolean {
   return !!process.env.DATABASE_URL;
@@ -163,4 +168,95 @@ export async function adminRestoreArticle(id: number): Promise<void> {
 /** 영구 삭제(되돌릴 수 없음). */
 export async function adminPurgeArticle(id: number): Promise<void> {
   await getDb().delete(articles).where(eq(articles.id, id));
+}
+
+// ───────── 수정 이력(버전) ─────────
+
+export type RevisionSnapshot = {
+  title: string;
+  subtitle: string | null;
+  reporterName: string | null;
+  section: string;
+  region: string | null;
+  displaySlot: string | null;
+  thumbnailUrl: string | null;
+  bodyHtml: string;
+  bodyText: string | null;
+  source: string | null;
+  sourceUrl: string | null;
+  tags: string[];
+  status: ArticleStatus;
+};
+
+function snapshotOf(a: Article): RevisionSnapshot {
+  return {
+    title: a.title,
+    subtitle: a.subtitle,
+    reporterName: a.reporterName,
+    section: a.section,
+    region: a.region,
+    displaySlot: a.displaySlot,
+    thumbnailUrl: a.thumbnailUrl,
+    bodyHtml: a.bodyHtml,
+    bodyText: a.bodyText,
+    source: a.source,
+    sourceUrl: a.sourceUrl,
+    tags: (a.tags as string[] | null) ?? [],
+    status: a.status,
+  };
+}
+
+/** 현재 기사 상태를 이력으로 저장(저장 직전 호출). 기사당 최근 20개만 유지. */
+export async function saveRevision(articleId: number): Promise<void> {
+  const a = await adminGetArticle(articleId);
+  if (!a) return;
+  const db = getDb();
+  await db
+    .insert(articleRevisions)
+    .values({ articleId, title: a.title, snapshot: snapshotOf(a) });
+  await db.execute(
+    sql`delete from article_revisions where article_id = ${articleId} and id not in (select id from article_revisions where article_id = ${articleId} order by id desc limit 20)`,
+  );
+}
+
+export async function listRevisions(
+  articleId: number,
+): Promise<{ id: number; title: string; status: string; createdAt: Date | null }[]> {
+  const rows = await getDb()
+    .select({
+      id: articleRevisions.id,
+      title: articleRevisions.title,
+      snapshot: articleRevisions.snapshot,
+      createdAt: articleRevisions.createdAt,
+    })
+    .from(articleRevisions)
+    .where(eq(articleRevisions.articleId, articleId))
+    .orderBy(desc(articleRevisions.id))
+    .limit(20);
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title ?? "",
+    status: ((r.snapshot as RevisionSnapshot | null)?.status as string) ?? "",
+    createdAt: r.createdAt,
+  }));
+}
+
+/** 특정 이력으로 되돌리기 — 되돌리기 전에 현재 상태도 이력으로 남긴다. */
+export async function restoreRevision(
+  articleId: number,
+  revId: number,
+): Promise<void> {
+  const [rev] = await getDb()
+    .select()
+    .from(articleRevisions)
+    .where(
+      and(
+        eq(articleRevisions.id, revId),
+        eq(articleRevisions.articleId, articleId),
+      ),
+    )
+    .limit(1);
+  if (!rev) return;
+  await saveRevision(articleId);
+  await adminUpdateArticle(articleId, rev.snapshot as Partial<NewArticle>);
 }

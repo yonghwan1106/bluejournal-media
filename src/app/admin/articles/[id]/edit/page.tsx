@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { dbConfigured, adminGetArticle } from "@/lib/admin-db";
+import { dbConfigured, adminGetArticle, listRevisions } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
 import { ArticleForm } from "@/components/admin/ArticleForm";
 import { Toast } from "@/components/admin/Toast";
-import { updateArticleAction, deleteArticleAction } from "../../../actions";
+import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { formatDateTime } from "@/lib/format";
+import {
+  updateArticleAction,
+  deleteArticleAction,
+  restoreRevisionAction,
+} from "../../../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "기사 편집" };
@@ -30,6 +36,7 @@ export default async function EditArticlePage({
   const sp = await searchParams;
   const a = await adminGetArticle(Number(id));
   if (!a) notFound();
+  const revisions = await listRevisions(a.id);
 
   const update = updateArticleAction.bind(null, a.id);
   const del = deleteArticleAction.bind(null, a.id);
@@ -55,6 +62,41 @@ export default async function EditArticlePage({
         )}
       </div>
       <ArticleForm article={a} action={update} />
+
+      {revisions.length > 0 && (
+        <section className="mt-10 border-t border-line pt-6">
+          <h2 className="mb-3 text-sm font-bold text-ink">
+            수정 이력 ({revisions.length})
+          </h2>
+          <ul className="space-y-2 text-sm">
+            {revisions.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-3 border-b border-line pb-2"
+              >
+                <span className="truncate text-muted">
+                  {formatDateTime(
+                    r.createdAt ? new Date(r.createdAt).toISOString() : null,
+                  )}
+                  {" · "}
+                  {r.title}
+                </span>
+                <form action={restoreRevisionAction}>
+                  <input type="hidden" name="articleId" value={a.id} />
+                  <input type="hidden" name="revId" value={r.id} />
+                  <ConfirmButton
+                    message="이 버전으로 되돌립니다. 현재 내용도 이력에 저장됩니다. 계속할까요?"
+                    className="shrink-0 rounded-md border border-brand px-2 py-1 text-xs font-medium text-brand hover:bg-brand-light"
+                  >
+                    되돌리기
+                  </ConfirmButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <form action={del} className="mt-10 border-t border-line pt-4">
         <button className="text-sm text-accent hover:underline">
           이 기사 삭제
