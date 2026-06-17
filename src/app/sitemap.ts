@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
-import { getAllArticles } from "@/lib/articles";
+import { getSitemapArticles } from "@/lib/articles";
 import { SITE } from "@/lib/site";
 
-export const dynamic = "force-static";
+// 신규 기사가 사이트맵에 반영되도록 시간당 재생성(SEO)
+export const revalidate = 3600;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = SITE.url;
   const statics: MetadataRoute.Sitemap = [
     "",
@@ -25,12 +26,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: p === "" ? 1 : 0.5,
   }));
 
-  const articles: MetadataRoute.Sitemap = getAllArticles().map((a) => ({
-    url: `${base}/news/${a.id}`,
-    lastModified: a.publishedAt ?? undefined,
-    changeFrequency: "monthly",
-    priority: 0.7,
-  }));
+  const articles: MetadataRoute.Sitemap = (await getSitemapArticles()).map(
+    (a) => ({
+      url: `${base}/news/${a.id}`,
+      lastModified: a.publishedAt ?? undefined,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    }),
+  );
 
   return [...statics, ...articles];
 }

@@ -6,8 +6,12 @@ import { rewriteBodyImages, resolveImg } from "@/lib/media";
 import { formatDateTime } from "@/lib/format";
 import { ArticleCard } from "@/components/ArticleCard";
 
-export function generateStaticParams() {
-  return getAllIds().map((id) => ({ id: String(id) }));
+// ISR: 기존 기사는 빌드시 프리렌더, 신규(미지정 id)는 on-demand 후 캐시. 최대 60초마다 갱신.
+export const revalidate = 60;
+
+export async function generateStaticParams() {
+  const ids = await getAllIds();
+  return ids.map((id) => ({ id: String(id) }));
 }
 
 export async function generateMetadata({
@@ -16,7 +20,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const a = getArticle(Number(id));
+  const a = await getArticle(Number(id));
   if (!a) return { title: "기사를 찾을 수 없습니다" };
   const img = resolveImg(a.thumbnailUrl);
   const desc = a.subtitle ?? a.bodyText?.slice(0, 120) ?? undefined;
@@ -41,11 +45,11 @@ export default async function ArticlePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const a = getArticle(Number(id));
+  const a = await getArticle(Number(id));
   if (!a) notFound();
 
   const body = rewriteBodyImages(a.bodyHtml);
-  const related = getRelated(a);
+  const related = await getRelated(a);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">

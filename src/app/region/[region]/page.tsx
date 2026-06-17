@@ -2,6 +2,8 @@ import { getByRegion, REGIONS } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
 import type { Metadata } from "next";
 
+export const revalidate = 60;
+
 export function generateStaticParams() {
   return REGIONS.map((r) => ({ region: r }));
 }
@@ -22,7 +24,7 @@ export default async function RegionPage({
 }) {
   const { region } = await params;
   const r = decodeURIComponent(region);
-  const list = getByRegion(r);
+  const list = await getByRegion(r);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">

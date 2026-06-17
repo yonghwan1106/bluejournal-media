@@ -31,9 +31,17 @@ export default async function EditArticlePage({
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">기사 편집 #{a.id}</h1>
-        <Link href={`/news/${a.id}`} target="_blank" className="text-sm text-brand">
-          미리보기 ↗
-        </Link>
+        {a.status === "published" ? (
+          <Link
+            href={`/news/${a.id}`}
+            target="_blank"
+            className="text-sm text-brand"
+          >
+            미리보기 ↗
+          </Link>
+        ) : (
+          <span className="text-sm text-muted">미게시(공개 미리보기 불가)</span>
+        )}
       </div>
       {sp.saved && (
         <p className="mb-4 rounded bg-green-50 p-2 text-sm text-green-700">

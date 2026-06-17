@@ -2,6 +2,8 @@ import { getBySection, SECTIONS } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
 import type { Metadata } from "next";
 
+export const revalidate = 60;
+
 export function generateStaticParams() {
   return SECTIONS.map((s) => ({ section: s }));
 }
@@ -22,7 +24,7 @@ export default async function SectionPage({
 }) {
   const { section } = await params;
   const s = decodeURIComponent(section);
-  const list = getBySection(s);
+  const list = await getBySection(s);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">

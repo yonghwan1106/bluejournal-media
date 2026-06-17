@@ -10,7 +10,7 @@ export default async function SearchPage({
 }) {
   const sp = await searchParams;
   const q = (sp.q ?? "").toString().trim();
-  const results = q ? searchArticles(q) : [];
+  const results = q ? await searchArticles(q) : [];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">

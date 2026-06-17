@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { getAllArticles, getByRegion } from "@/lib/articles";
+import { getLatest, getByRegion } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
+
+// ISR: 정적 캐시 후 최대 60초마다 백그라운드 재생성 (관리자 발행/수정은 revalidatePath 로 즉시 반영)
+export const revalidate = 60;
 
 function SectionTitle({ title, href }: { title: string; href?: string }) {
   return (
@@ -15,14 +18,16 @@ function SectionTitle({ title, href }: { title: string; href?: string }) {
   );
 }
 
-export default function Home() {
-  const all = getAllArticles();
-  const headline = all[0];
-  const sub = all.slice(1, 5); // 주요뉴스
-  const latest = all.slice(5, 17); // 최신
-  const gyeonggi = getByRegion("경기", 6);
-  const seoul = getByRegion("서울", 5);
-  const incheon = getByRegion("인천", 5);
+export default async function Home() {
+  const top = await getLatest(17);
+  const headline = top[0];
+  const sub = top.slice(1, 5); // 주요뉴스
+  const latest = top.slice(5, 17); // 최신
+  const [gyeonggi, seoul, incheon] = await Promise.all([
+    getByRegion("경기", 6),
+    getByRegion("서울", 5),
+    getByRegion("인천", 5),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">

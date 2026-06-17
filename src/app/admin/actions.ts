@@ -11,6 +11,19 @@ import {
 import { kstInputToDate } from "@/lib/format";
 import type { NewArticle } from "@/db/schema";
 
+/**
+ * 발행/수정/삭제 시 영향받는 공개 경로를 즉시 무효화(ISR 갱신 대기 없이 반영).
+ * 섹션/지역은 route-pattern 형으로 무효화 → 한글 세그먼트 인코딩 footgun 회피 +
+ * 기사 이동(구→신 섹션) / 삭제 시 구 목록까지 한 번에 갱신(순서·값 무관).
+ */
+function revalidatePublic(id?: number) {
+  revalidatePath("/"); // 홈(헤드라인/최신)
+  revalidatePath("/admin");
+  revalidatePath("/section/[section]", "page"); // 모든 섹션 목록
+  revalidatePath("/region/[region]", "page"); // 모든 지역 목록
+  if (id) revalidatePath(`/news/${id}`); // 해당 기사 상세
+}
+
 export async function loginAction(formData: FormData) {
   const u = String(formData.get("username") ?? "");
   const p = String(formData.get("password") ?? "");
@@ -64,7 +77,7 @@ export async function createArticleAction(formData: FormData) {
   const data = parseForm(formData);
   if (!data.title) redirect("/admin/articles/new?error=title");
   const id = await adminCreateArticle(data);
-  revalidatePath("/admin");
+  revalidatePublic(id);
   redirect(`/admin/articles/${id}/edit?saved=1`);
 }
 
@@ -72,14 +85,13 @@ export async function updateArticleAction(id: number, formData: FormData) {
   await requireAdmin();
   const data = parseForm(formData);
   await adminUpdateArticle(id, data);
-  revalidatePath("/admin");
-  revalidatePath(`/news/${id}`);
+  revalidatePublic(id);
   redirect(`/admin/articles/${id}/edit?saved=1`);
 }
 
 export async function deleteArticleAction(id: number) {
   await requireAdmin();
   await adminDeleteArticle(id);
-  revalidatePath("/admin");
+  revalidatePublic(id);
   redirect("/admin");
 }
