@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   verification: {
     other: { "naver-site-verification": "78b7ca18a929d402763aa298cc0056dbd6f7def6" },
   },
+  // RSS 자동발견(브라우저·수집기가 피드를 찾도록)
+  alternates: {
+    types: { "application/rss+xml": "/rss.xml" },
+  },
 };
 
 export default function RootLayout({
