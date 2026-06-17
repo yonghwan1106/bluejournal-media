@@ -66,6 +66,8 @@ export const articles = pgTable(
     updatedAt: ts("updated_at")
       .defaultNow()
       .$onUpdate(() => new Date()),
+    // 휴지통(소프트 삭제): 값이 있으면 삭제 상태 → 공개·관리 목록에서 제외, 복원 가능.
+    deletedAt: ts("deleted_at"),
   },
   (t) => [
     index("section_idx").on(t.section),

@@ -7,6 +7,8 @@ import {
   adminCreateArticle,
   adminUpdateArticle,
   adminDeleteArticle,
+  adminRestoreArticle,
+  adminPurgeArticle,
 } from "@/lib/admin-db";
 import { kstInputToDate } from "@/lib/format";
 import type { NewArticle } from "@/db/schema";
@@ -134,6 +136,37 @@ export async function setStatusAction(formData: FormData) {
       revalidatePublic(id);
     } catch (e) {
       console.error("[admin] 상태 변경 실패:", e);
+    }
+  }
+  redirect(returnTo);
+}
+
+/** 휴지통에서 복원. */
+export async function restoreArticleAction(formData: FormData) {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const returnTo = String(formData.get("returnTo") || "/admin?trash=1");
+  if (Number.isFinite(id)) {
+    try {
+      await adminRestoreArticle(id);
+      revalidatePublic(id);
+    } catch (e) {
+      console.error("[admin] 복원 실패:", e);
+    }
+  }
+  redirect(returnTo);
+}
+
+/** 영구 삭제(되돌릴 수 없음). */
+export async function purgeArticleAction(formData: FormData) {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const returnTo = String(formData.get("returnTo") || "/admin?trash=1");
+  if (Number.isFinite(id)) {
+    try {
+      await adminPurgeArticle(id);
+    } catch (e) {
+      console.error("[admin] 영구삭제 실패:", e);
     }
   }
   redirect(returnTo);

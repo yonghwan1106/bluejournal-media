@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { and, eq, ne, or, ilike, sql as dsql } from "drizzle-orm";
+import { and, eq, ne, or, ilike, isNull, sql as dsql } from "drizzle-orm";
 import seedData from "../../seed/articles.json";
 import { getDb } from "@/db";
 import { articles } from "@/db/schema";
@@ -155,7 +155,7 @@ export const getAllArticles = cache(
           await getDb()
             .select(CARD_COLS)
             .from(articles)
-            .where(eq(articles.status, "published"))
+            .where(and(eq(articles.status, "published"), isNull(articles.deletedAt)))
             .orderBy(pubOrder)
         ).map(fromCard),
       () => jsonPub(),
@@ -171,7 +171,7 @@ export const getSitemapArticles = cache(
           await getDb()
             .select({ id: articles.id, publishedAt: articles.publishedAt })
             .from(articles)
-            .where(eq(articles.status, "published"))
+            .where(and(eq(articles.status, "published"), isNull(articles.deletedAt)))
             .orderBy(pubOrder)
         ).map((r) => ({ id: r.id, publishedAt: isoOrNull(r.publishedAt) })),
       () => jsonPub().map((a) => ({ id: a.id, publishedAt: a.publishedAt })),
@@ -186,7 +186,7 @@ export const getArticle = cache(
         const r = await getDb()
           .select()
           .from(articles)
-          .where(and(eq(articles.id, id), eq(articles.status, "published")))
+          .where(and(eq(articles.id, id), and(eq(articles.status, "published"), isNull(articles.deletedAt))))
           .limit(1);
         return r[0] ? fromFull(r[0]) : null;
       },
@@ -202,7 +202,7 @@ export const getLatest = cache(
           await getDb()
             .select(CARD_COLS)
             .from(articles)
-            .where(eq(articles.status, "published"))
+            .where(and(eq(articles.status, "published"), isNull(articles.deletedAt)))
             .orderBy(pubOrder)
             .limit(n)
         ).map(fromCard),
@@ -223,7 +223,7 @@ export const getBySection = cache(
             .select(CARD_COLS)
             .from(articles)
             .where(
-              and(eq(articles.status, "published"), eq(articles.section, section)),
+              and(and(eq(articles.status, "published"), isNull(articles.deletedAt)), eq(articles.section, section)),
             )
             .orderBy(pubOrder)
             .limit(n)
@@ -241,7 +241,7 @@ export const getByRegion = cache(
             .select(CARD_COLS)
             .from(articles)
             .where(
-              and(eq(articles.status, "published"), eq(articles.region, region)),
+              and(and(eq(articles.status, "published"), isNull(articles.deletedAt)), eq(articles.region, region)),
             )
             .orderBy(pubOrder)
             .limit(n)
@@ -262,7 +262,7 @@ export const searchArticles = cache(
           .from(articles)
           .where(
             and(
-              eq(articles.status, "published"),
+              and(eq(articles.status, "published"), isNull(articles.deletedAt)),
               or(
                 ilike(articles.title, like),
                 ilike(articles.bodyText, like),
@@ -308,7 +308,7 @@ export const getRelated = cache(
           .from(articles)
           .where(
             and(
-              eq(articles.status, "published"),
+              and(eq(articles.status, "published"), isNull(articles.deletedAt)),
               ne(articles.id, a.id),
               or(regionCond, tagCond),
             ),
@@ -333,7 +333,7 @@ export const getAllIds = cache(
           await getDb()
             .select({ id: articles.id })
             .from(articles)
-            .where(eq(articles.status, "published"))
+            .where(and(eq(articles.status, "published"), isNull(articles.deletedAt)))
         ).map((r) => r.id),
       () => jsonPub().map((a) => a.id),
     ),
@@ -346,7 +346,7 @@ export const countArticles = cache(
         const r = await getDb()
           .select({ c: dsql<number>`count(*)::int` })
           .from(articles)
-          .where(eq(articles.status, "published"));
+          .where(and(eq(articles.status, "published"), isNull(articles.deletedAt)));
         return r[0]?.c ?? 0;
       },
       () => jsonPub().length,
