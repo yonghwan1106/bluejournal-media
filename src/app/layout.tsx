@@ -22,6 +22,10 @@ export const metadata: Metadata = {
     url: SITE.url,
   },
   robots: { index: allowIndex, follow: allowIndex },
+  // 네이버 서치어드바이저 사이트 소유확인 (HTML 태그 방식)
+  verification: {
+    other: { "naver-site-verification": "78b7ca18a929d402763aa298cc0056dbd6f7def6" },
+  },
 };
 
 export default function RootLayout({
