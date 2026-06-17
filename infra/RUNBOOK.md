@@ -42,13 +42,15 @@ cd C:/Users/user/bluejournal-web && vercel link --yes && vercel deploy --yes
 4. (선택) 공개 액세스 또는 커스텀 도메인 공개 허용
 → 발급한 값(account id, access key, secret, 버킷명)을 어시스턴트에게 전달하거나 `.env`에 기입.
 
-## 3. ✅→🙋 이미지 R2 업로드
+## 3. ✅ 이미지 R2 업로드 — **완료(2026-06-17)**
 ```bash
-# rclone 설치 후 (https://rclone.org)
-#   bluejournal-web/infra/upload-to-r2.sh 참고 — 환경변수 채우고 실행
-bash bluejournal-web/infra/upload-to-r2.sh
+# (A) rclone 불필요 — Node(@aws-sdk/client-s3)로 업로드. 재실행 시 기존 파일 건너뜀.
+#   .env 에 R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/R2_BUCKET 설정 후
+node --env-file=.env infra/upload-to-r2.mjs
+# (B) rclone 사용 시: bash infra/upload-to-r2.sh
 ```
-→ `out/media/data/...` 가 R2의 동일 경로로 업로드됨(구 URL 경로 보존).
+→ `out/media/data/...` 가 R2의 동일 경로(`data/...`)로 업로드됨(구 URL 경로 보존).
+- ✅실적재: 1,052개(~908MB) 업로드 성공(실패 0). 공개 r2.dev URL 로드 검증 완료.
 
 ---
 
