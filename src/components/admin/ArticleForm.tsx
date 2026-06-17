@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Article } from "@/db/schema";
 import { toKstInput } from "@/lib/format";
 import { RichEditor } from "./RichEditor";
+import { MediaLibrary } from "./MediaLibrary";
 
 const field = "w-full rounded-md border border-line px-3 py-2 outline-none focus:border-brand";
 const labelCls = "block text-sm font-bold mb-1";
@@ -123,6 +124,11 @@ export function ArticleForm({
             {uploading ? "업로드중…" : "업로드"}
             <input type="file" accept="image/*" onChange={upload} className="hidden" disabled={uploading} />
           </label>
+          <MediaLibrary
+            label="라이브러리"
+            buttonClassName="shrink-0 rounded-md border border-line px-3 py-2 text-sm font-bold text-muted hover:text-ink"
+            onSelect={(url) => setThumb(url)}
+          />
         </div>
         {uploadMsg && <p className="mt-1 text-xs text-muted">{uploadMsg}</p>}
         {thumb && (

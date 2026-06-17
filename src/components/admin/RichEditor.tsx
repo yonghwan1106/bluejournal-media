@@ -6,6 +6,7 @@ import Image from "@tiptap/extension-image";
 import { TableKit } from "@tiptap/extension-table";
 import Youtube from "@tiptap/extension-youtube";
 import { useEffect, useRef, useState } from "react";
+import { MediaLibrary } from "./MediaLibrary";
 
 async function uploadImage(file: File): Promise<string | null> {
   const fd = new FormData();
@@ -205,6 +206,11 @@ export function RichEditor({
           <Sep />
           <Btn title="링크" active={editor.isActive("link")} onClick={setLink}>🔗</Btn>
           <Btn title="이미지 삽입" onClick={() => fileRef.current?.click()}>🖼 이미지</Btn>
+          <MediaLibrary
+            label="📁 라이브러리"
+            buttonClassName="rounded px-2 py-1 text-sm font-semibold text-ink hover:bg-brand-light"
+            onSelect={(url) => editor.chain().focus().setImage({ src: url }).run()}
+          />
           <Btn title="표 삽입" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>▦ 표</Btn>
           <Btn title="영상(YouTube) 삽입" onClick={addYoutube}>▶ 영상</Btn>
           {uploading && <span className="ml-1 text-xs text-muted">업로드중…</span>}
