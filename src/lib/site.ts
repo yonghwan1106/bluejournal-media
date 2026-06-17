@@ -16,6 +16,7 @@ export const SITE = {
   founded: "2025-12-29",
   address: "경기도 수원시 권선구 서호동로26번길19 3층302호(서문동)",
   tel: "031-287-2215",
+  mobile: "010-7939-3123", // 대표 휴대전화(제보·문의)
   fax: "031-287-2215",
   email: "bluejournal@daum.net",
 } as const;

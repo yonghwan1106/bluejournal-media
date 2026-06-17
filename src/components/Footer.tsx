@@ -35,7 +35,7 @@ export function Footer() {
           </div>
           <div>{SITE.address}</div>
           <div>
-            대표전화 {SITE.tel} · 이메일 {SITE.email}
+            대표전화 {SITE.tel}, {SITE.mobile} · 이메일 {SITE.email}
           </div>
         </dl>
 

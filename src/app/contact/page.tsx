@@ -25,13 +25,14 @@ export default function ContactPage() {
         >
           <div className="text-sm font-bold text-brand">전화 제보·문의</div>
           <div className="mt-1 text-lg font-semibold">{SITE.tel}</div>
+          <div className="text-lg font-semibold">{SITE.mobile}</div>
         </a>
       </div>
 
       <div className="mt-8 rounded-lg bg-[#f7f8fa] p-5 text-sm leading-7 text-muted">
         <div className="font-bold text-ink">{SITE.name}</div>
         <div className="mt-1">{SITE.address}</div>
-        <div>대표전화 {SITE.tel} · 이메일 {SITE.email}</div>
+        <div>대표전화 {SITE.tel}, {SITE.mobile} · 이메일 {SITE.email}</div>
         <div>광고·제휴 문의도 위 연락처로 받습니다.</div>
       </div>
     </div>
