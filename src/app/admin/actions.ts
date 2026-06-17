@@ -11,6 +11,15 @@ import {
 import { kstInputToDate } from "@/lib/format";
 import type { NewArticle } from "@/db/schema";
 
+const STATUSES = ["published", "draft", "hidden"] as const;
+type ArticleStatus = (typeof STATUSES)[number];
+/** 허용된 status 값만 통과 — 잘못된 값으로 인한 PG enum 제약 위반(500)을 방지. */
+function normStatus(v: unknown, fallback: ArticleStatus): ArticleStatus {
+  return typeof v === "string" && (STATUSES as readonly string[]).includes(v)
+    ? (v as ArticleStatus)
+    : fallback;
+}
+
 /**
  * 발행/수정/삭제 시 영향받는 공개 경로를 즉시 무효화(ISR 갱신 대기 없이 반영).
  * 섹션/지역은 route-pattern 형으로 무효화 → 한글 세그먼트 인코딩 footgun 회피 +
@@ -66,7 +75,7 @@ function parseForm(fd: FormData): Omit<NewArticle, "id"> {
     sourceUrl: str("sourceUrl"),
     tags,
     viewCount: 0,
-    status: (str("status") as "published" | "draft" | "hidden") ?? "draft",
+    status: normStatus(str("status"), "draft"),
     // datetime-local 값은 KST 벽시계 → 정확한 instant 로 변환
     publishedAt: pub ? kstInputToDate(pub) : new Date(),
   };
@@ -76,7 +85,13 @@ export async function createArticleAction(formData: FormData) {
   await requireAdmin();
   const data = parseForm(formData);
   if (!data.title) redirect("/admin/articles/new?error=title");
-  const id = await adminCreateArticle(data);
+  let id: number;
+  try {
+    id = await adminCreateArticle(data);
+  } catch (e) {
+    console.error("[admin] 기사 생성 실패:", e);
+    redirect("/admin/articles/new?error=save");
+  }
   revalidatePublic(id);
   redirect(`/admin/articles/${id}/edit?saved=1`);
 }
@@ -84,14 +99,25 @@ export async function createArticleAction(formData: FormData) {
 export async function updateArticleAction(id: number, formData: FormData) {
   await requireAdmin();
   const data = parseForm(formData);
-  await adminUpdateArticle(id, data);
+  if (!data.title) redirect(`/admin/articles/${id}/edit?error=title`);
+  try {
+    await adminUpdateArticle(id, data);
+  } catch (e) {
+    console.error("[admin] 기사 수정 실패:", e);
+    redirect(`/admin/articles/${id}/edit?error=save`);
+  }
   revalidatePublic(id);
   redirect(`/admin/articles/${id}/edit?saved=1`);
 }
 
 export async function deleteArticleAction(id: number) {
   await requireAdmin();
-  await adminDeleteArticle(id);
+  try {
+    await adminDeleteArticle(id);
+  } catch (e) {
+    console.error("[admin] 기사 삭제 실패:", e);
+    redirect(`/admin/articles/${id}/edit?error=delete`);
+  }
   revalidatePublic(id);
   redirect("/admin");
 }
