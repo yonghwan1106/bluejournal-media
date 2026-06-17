@@ -26,6 +26,31 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // 전역 보안 응답 헤더. 엄격 CSP 는 Next 하이드레이션 nonce 배선 + 라이브 검증이
+  // 필요해 후속 과제로 분리(저장형 XSS 는 본문 새니타이즈로 1차 차단됨).
+  async headers() {
+    const isProd = process.env.NODE_ENV === "production";
+    const securityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "X-DNS-Prefetch-Control", value: "on" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=()",
+      },
+      // HSTS 는 https 환경에서만 의미 → 운영(프리뷰 vercel.app 포함 https)에서만 적용.
+      ...(isProd
+        ? [
+            {
+              key: "Strict-Transport-Security",
+              value: "max-age=31536000; includeSubDomains",
+            },
+          ]
+        : []),
+    ];
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
 };
 
 export default nextConfig;

@@ -3,12 +3,28 @@ import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-const SECRET = process.env.AUTH_SECRET || "dev-insecure-secret-change-me";
 const COOKIE = "bj_admin";
 const MAXAGE = 60 * 60 * 8; // 8시간
 
+/**
+ * 세션 서명 시크릿. 운영(production)에서 AUTH_SECRET 미설정 시 조용히 폴백하지 않고
+ * 즉시 throw(fail-fast) — 알려진 폴백 시크릿으로 토큰이 위조되어 관리자 인증이
+ * 우회되는 것을 차단한다. lazy 호출이라 빌드 단계(공개 페이지는 auth 미사용, 관리자/
+ * API 는 동적 라우트라 빌드시 미실행)는 막지 않으며, 개발 환경에서만 폴백을 허용한다.
+ */
+function getSecret(): string {
+  const s = process.env.AUTH_SECRET;
+  if (s) return s;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "AUTH_SECRET 환경변수가 설정되지 않았습니다. 운영 환경에서는 필수입니다.",
+    );
+  }
+  return "dev-insecure-secret-change-me";
+}
+
 function sign(data: string) {
-  return crypto.createHmac("sha256", SECRET).update(data).digest("base64url");
+  return crypto.createHmac("sha256", getSecret()).update(data).digest("base64url");
 }
 
 export function createToken(username: string) {
