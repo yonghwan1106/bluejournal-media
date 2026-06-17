@@ -22,6 +22,13 @@
       "when": 1781698127379,
       "tag": "0002_spicy_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781698682662,
+      "tag": "0003_slim_xorn",
+      "breakpoints": true
     }
   ]
 }

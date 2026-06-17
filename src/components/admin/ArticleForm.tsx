@@ -12,9 +12,11 @@ const labelCls = "block text-sm font-bold mb-1";
 export function ArticleForm({
   article,
   action,
+  canPublish = true,
 }: {
   article?: Article;
   action: (fd: FormData) => void | Promise<void>;
+  canPublish?: boolean;
 }) {
   const [thumb, setThumb] = useState(article?.thumbnailUrl ?? "");
   const [uploading, setUploading] = useState(false);
@@ -98,10 +100,13 @@ export function ArticleForm({
         <div>
           <label className={labelCls}>상태</label>
           <select name="status" defaultValue={article?.status ?? "draft"} className={field}>
-            <option value="published">출력중</option>
+            {canPublish && <option value="published">출력중</option>}
             <option value="draft">대기</option>
             <option value="hidden">숨김</option>
           </select>
+          {!canPublish && (
+            <p className="mt-1 text-xs text-muted">발행 권한이 없어 초안으로 저장됩니다(편집장 검토 후 발행).</p>
+          )}
         </div>
       </div>
 

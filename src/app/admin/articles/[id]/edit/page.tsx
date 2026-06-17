@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, canPublish, canEditArticle } from "@/lib/auth";
 import { dbConfigured, adminGetArticle, listRevisions } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
 import { ArticleForm } from "@/components/admin/ArticleForm";
@@ -29,13 +29,25 @@ export default async function EditArticlePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!dbConfigured()) return <NoDbNotice />;
 
   const { id } = await params;
   const sp = await searchParams;
   const a = await adminGetArticle(Number(id));
   if (!a) notFound();
+  if (!canEditArticle(session, a.authorId)) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center text-muted">
+        이 기사를 수정할 권한이 없습니다. (기자는 본인이 작성한 기사만 수정할 수 있습니다.)
+        <div className="mt-4">
+          <Link href="/admin" className="text-brand hover:underline">
+            ← 기사 관리로
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const revisions = await listRevisions(a.id);
 
   const update = updateArticleAction.bind(null, a.id);
@@ -61,7 +73,7 @@ export default async function EditArticlePage({
           <span className="text-sm text-muted">미게시(공개 미리보기 불가)</span>
         )}
       </div>
-      <ArticleForm article={a} action={update} />
+      <ArticleForm article={a} action={update} canPublish={canPublish(session)} />
 
       {revisions.length > 0 && (
         <section className="mt-10 border-t border-line pt-6">

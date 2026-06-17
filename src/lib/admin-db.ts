@@ -14,9 +14,11 @@ import { getDb } from "@/db";
 import {
   articles,
   articleRevisions,
+  users,
   type NewArticle,
   type Article,
 } from "@/db/schema";
+import { hashPassword, type Role } from "@/lib/auth";
 
 export function dbConfigured(): boolean {
   return !!process.env.DATABASE_URL;
@@ -259,4 +261,40 @@ export async function restoreRevision(
   if (!rev) return;
   await saveRevision(articleId);
   await adminUpdateArticle(articleId, rev.snapshot as Partial<NewArticle>);
+}
+
+// ───────── 사용자 계정(RBAC) ─────────
+
+export async function listUsers() {
+  return getDb()
+    .select({
+      id: users.id,
+      username: users.username,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .orderBy(desc(users.id));
+}
+
+export async function createUser(data: {
+  username: string;
+  name: string;
+  password: string;
+  role: Role;
+  email?: string | null;
+}): Promise<void> {
+  await getDb().insert(users).values({
+    username: data.username,
+    name: data.name,
+    email: data.email ?? null,
+    role: data.role,
+    passwordHash: hashPassword(data.password),
+  });
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  await getDb().delete(users).where(eq(users.id, id));
 }

@@ -68,6 +68,8 @@ export const articles = pgTable(
       .$onUpdate(() => new Date()),
     // 휴지통(소프트 삭제): 값이 있으면 삭제 상태 → 공개·관리 목록에서 제외, 복원 가능.
     deletedAt: ts("deleted_at"),
+    // 작성자(users.id) — 기자 권한(자기 글만 편집) 판정용. 기존/외부 기사는 null.
+    authorId: integer("author_id"),
   },
   (t) => [
     index("section_idx").on(t.section),

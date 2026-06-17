@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, canPublish, canManageUsers } from "@/lib/auth";
 import {
   dbConfigured,
   adminListArticles,
@@ -64,10 +64,13 @@ export default async function AdminHome({
     page?: string;
     deleted?: string;
     trash?: string;
+    denied?: string;
   }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!dbConfigured()) return <NoDbNotice />;
+  const pub = canPublish(session);
+  const canMgr = canManageUsers(session);
 
   const sp = await searchParams;
   const trash = sp.trash === "1";
@@ -104,6 +107,7 @@ export default async function AdminHome({
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       {sp.deleted && <Toast message="휴지통으로 이동했습니다." />}
+      {sp.denied && <Toast type="error" message="권한이 없습니다." />}
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">
@@ -125,6 +129,23 @@ export default async function AdminHome({
               + 새 기사
             </Link>
           )}
+          {canMgr && (
+            <Link
+              href="/admin/users"
+              className="rounded-md border border-line px-4 py-2 text-sm font-bold text-muted hover:text-ink"
+            >
+              계정관리
+            </Link>
+          )}
+          <span className="hidden text-xs text-muted sm:inline">
+            {session.u} (
+            {session.role === "admin"
+              ? "관리자"
+              : session.role === "editor"
+                ? "편집장"
+                : "기자"}
+            )
+          </span>
           <form action={logoutAction}>
             <button className="rounded-md border border-line px-4 py-2 text-sm font-bold text-muted hover:text-ink">
               로그아웃
@@ -234,7 +255,7 @@ export default async function AdminHome({
             </>
           )}
         </p>
-        {!trash && (
+        {!trash && pub && (
           <Link href="/admin?trash=1" className="text-sm text-muted hover:text-ink">
             🗑 휴지통 ({stats.trash})
           </Link>
@@ -319,24 +340,26 @@ export default async function AdminHome({
                     </div>
                   ) : (
                     <div className="flex items-center justify-end gap-3">
-                      <form action={setStatusAction}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <input
-                          type="hidden"
-                          name="status"
-                          value={a.status === "published" ? "draft" : "published"}
-                        />
-                        <input type="hidden" name="returnTo" value={returnTo} />
-                        <button
-                          className={`rounded-md border px-2 py-1 text-xs font-medium ${
-                            a.status === "published"
-                              ? "border-line text-muted hover:text-ink"
-                              : "border-brand text-brand hover:bg-brand-light"
-                          }`}
-                        >
-                          {a.status === "published" ? "숨기기" : "발행"}
-                        </button>
-                      </form>
+                      {pub && (
+                        <form action={setStatusAction}>
+                          <input type="hidden" name="id" value={a.id} />
+                          <input
+                            type="hidden"
+                            name="status"
+                            value={a.status === "published" ? "draft" : "published"}
+                          />
+                          <input type="hidden" name="returnTo" value={returnTo} />
+                          <button
+                            className={`rounded-md border px-2 py-1 text-xs font-medium ${
+                              a.status === "published"
+                                ? "border-line text-muted hover:text-ink"
+                                : "border-brand text-brand hover:bg-brand-light"
+                            }`}
+                          >
+                            {a.status === "published" ? "숨기기" : "발행"}
+                          </button>
+                        </form>
+                      )}
                       <Link
                         href={`/admin/articles/${a.id}/edit`}
                         className="text-brand hover:underline"

@@ -2,15 +2,27 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { setSession, clearSession, checkCredentials, requireAdmin } from "@/lib/auth";
+import {
+  setSession,
+  clearSession,
+  requireAdmin,
+  requireRole,
+  authenticate,
+  canPublish,
+  canEditArticle,
+} from "@/lib/auth";
+import type { Role } from "@/lib/auth";
 import {
   adminCreateArticle,
   adminUpdateArticle,
   adminDeleteArticle,
   adminRestoreArticle,
   adminPurgeArticle,
+  adminGetArticle,
   saveRevision,
   restoreRevision,
+  createUser,
+  deleteUser,
 } from "@/lib/admin-db";
 import { kstInputToDate } from "@/lib/format";
 import type { NewArticle } from "@/db/schema";
@@ -24,24 +36,21 @@ function normStatus(v: unknown, fallback: ArticleStatus): ArticleStatus {
     : fallback;
 }
 
-/**
- * 발행/수정/삭제 시 영향받는 공개 경로를 즉시 무효화(ISR 갱신 대기 없이 반영).
- * 섹션/지역은 route-pattern 형으로 무효화 → 한글 세그먼트 인코딩 footgun 회피 +
- * 기사 이동(구→신 섹션) / 삭제 시 구 목록까지 한 번에 갱신(순서·값 무관).
- */
+/** 발행/수정/삭제 시 영향받는 공개 경로를 즉시 무효화(ISR 갱신 대기 없이 반영). */
 function revalidatePublic(id?: number) {
-  revalidatePath("/"); // 홈(헤드라인/최신)
+  revalidatePath("/");
   revalidatePath("/admin");
-  revalidatePath("/section/[section]", "page"); // 모든 섹션 목록
-  revalidatePath("/region/[region]", "page"); // 모든 지역 목록
-  if (id) revalidatePath(`/news/${id}`); // 해당 기사 상세
+  revalidatePath("/section/[section]", "page");
+  revalidatePath("/region/[region]", "page");
+  if (id) revalidatePath(`/news/${id}`);
 }
 
 export async function loginAction(formData: FormData) {
   const u = String(formData.get("username") ?? "");
   const p = String(formData.get("password") ?? "");
-  if (!checkCredentials(u, p)) redirect("/admin/login?error=1");
-  await setSession(u);
+  const session = await authenticate(u, p);
+  if (!session) redirect("/admin/login?error=1");
+  await setSession(session);
   redirect("/admin");
 }
 
@@ -78,17 +87,18 @@ function parseForm(fd: FormData): Omit<NewArticle, "id"> {
     source: str("source"),
     sourceUrl: str("sourceUrl"),
     tags,
-    // viewCount 는 의도적으로 제외 — 수정 시 0으로 덮어쓰지 않도록(신규는 스키마 default 0).
+    // viewCount 제외(수정 시 0 덮어쓰기 방지), status 는 권한에 따라 액션에서 보정
     status: normStatus(str("status"), "draft"),
-    // datetime-local 값은 KST 벽시계 → 정확한 instant 로 변환
     publishedAt: pub ? kstInputToDate(pub) : new Date(),
   };
 }
 
 export async function createArticleAction(formData: FormData) {
-  await requireAdmin();
+  const s = await requireAdmin();
   const data = parseForm(formData);
   if (!data.title) redirect("/admin/articles/new?error=title");
+  if (!canPublish(s)) data.status = "draft"; // 기자는 발행 불가 → 초안
+  data.authorId = s.uid; // 작성자 기록
   let id: number;
   try {
     id = await adminCreateArticle(data);
@@ -101,11 +111,15 @@ export async function createArticleAction(formData: FormData) {
 }
 
 export async function updateArticleAction(id: number, formData: FormData) {
-  await requireAdmin();
+  const s = await requireAdmin();
+  const existing = await adminGetArticle(id);
+  if (!existing) redirect("/admin");
+  if (!canEditArticle(s, existing.authorId)) redirect("/admin?denied=1");
   const data = parseForm(formData);
   if (!data.title) redirect(`/admin/articles/${id}/edit?error=title`);
+  if (!canPublish(s)) data.status = existing.status; // 기자는 상태 변경 불가(현 상태 유지)
   try {
-    await saveRevision(id); // 저장 직전 상태를 이력으로(베스트 에포트)
+    await saveRevision(id); // 저장 직전 상태 이력화(베스트 에포트)
   } catch (e) {
     console.error("[admin] 이력 저장 실패:", e);
   }
@@ -120,7 +134,9 @@ export async function updateArticleAction(id: number, formData: FormData) {
 }
 
 export async function deleteArticleAction(id: number) {
-  await requireAdmin();
+  const s = await requireAdmin();
+  const existing = await adminGetArticle(id);
+  if (existing && !canEditArticle(s, existing.authorId)) redirect("/admin?denied=1");
   try {
     await adminDeleteArticle(id);
   } catch (e) {
@@ -131,9 +147,10 @@ export async function deleteArticleAction(id: number) {
   redirect("/admin?deleted=1");
 }
 
-/** 목록에서 발행/숨김 즉시 토글. returnTo 로 현재 필터·페이지를 보존한다. */
+/** 목록에서 발행/숨김 즉시 토글(발행 권한 필요). */
 export async function setStatusAction(formData: FormData) {
-  await requireAdmin();
+  const s = await requireAdmin();
+  if (!canPublish(s)) redirect("/admin?denied=1");
   const id = Number(formData.get("id"));
   const status = normStatus(formData.get("status"), "draft");
   const returnTo = String(formData.get("returnTo") || "/admin");
@@ -148,9 +165,10 @@ export async function setStatusAction(formData: FormData) {
   redirect(returnTo);
 }
 
-/** 휴지통에서 복원. */
+/** 휴지통에서 복원(발행 권한 필요). */
 export async function restoreArticleAction(formData: FormData) {
-  await requireAdmin();
+  const s = await requireAdmin();
+  if (!canPublish(s)) redirect("/admin?denied=1");
   const id = Number(formData.get("id"));
   const returnTo = String(formData.get("returnTo") || "/admin?trash=1");
   if (Number.isFinite(id)) {
@@ -164,9 +182,10 @@ export async function restoreArticleAction(formData: FormData) {
   redirect(returnTo);
 }
 
-/** 영구 삭제(되돌릴 수 없음). */
+/** 영구 삭제(되돌릴 수 없음, 발행 권한 필요). */
 export async function purgeArticleAction(formData: FormData) {
-  await requireAdmin();
+  const s = await requireAdmin();
+  if (!canPublish(s)) redirect("/admin?denied=1");
   const id = Number(formData.get("id"));
   const returnTo = String(formData.get("returnTo") || "/admin?trash=1");
   if (Number.isFinite(id)) {
@@ -179,11 +198,13 @@ export async function purgeArticleAction(formData: FormData) {
   redirect(returnTo);
 }
 
-/** 특정 이력 버전으로 되돌리기(현재 상태도 이력에 저장됨). */
+/** 특정 이력 버전으로 되돌리기(본인 글 또는 편집장·관리자). */
 export async function restoreRevisionAction(formData: FormData) {
-  await requireAdmin();
+  const s = await requireAdmin();
   const articleId = Number(formData.get("articleId"));
   const revId = Number(formData.get("revId"));
+  const existing = Number.isFinite(articleId) ? await adminGetArticle(articleId) : null;
+  if (existing && !canEditArticle(s, existing.authorId)) redirect("/admin?denied=1");
   if (Number.isFinite(articleId) && Number.isFinite(revId)) {
     try {
       await restoreRevision(articleId, revId);
@@ -194,4 +215,41 @@ export async function restoreRevisionAction(formData: FormData) {
     }
   }
   redirect(`/admin/articles/${articleId}/edit?saved=1`);
+}
+
+// ───────── 계정 관리(관리자 전용) ─────────
+
+export async function createUserAction(formData: FormData) {
+  await requireRole(["admin"]);
+  const username = String(formData.get("username") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const email = String(formData.get("email") ?? "").trim() || null;
+  const roleRaw = String(formData.get("role") ?? "reporter");
+  const role: Role = (["admin", "editor", "reporter"].includes(roleRaw)
+    ? roleRaw
+    : "reporter") as Role;
+  if (!username || !name || password.length < 6) {
+    redirect("/admin/users?error=invalid");
+  }
+  try {
+    await createUser({ username, name, password, role, email });
+  } catch (e) {
+    console.error("[admin] 계정 생성 실패:", e);
+    redirect("/admin/users?error=dup");
+  }
+  redirect("/admin/users?created=1");
+}
+
+export async function deleteUserAction(formData: FormData) {
+  await requireRole(["admin"]);
+  const id = Number(formData.get("id"));
+  if (Number.isFinite(id)) {
+    try {
+      await deleteUser(id);
+    } catch (e) {
+      console.error("[admin] 계정 삭제 실패:", e);
+    }
+  }
+  redirect("/admin/users");
 }

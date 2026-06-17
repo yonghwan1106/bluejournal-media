@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, canPublish } from "@/lib/auth";
 import { dbConfigured } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
 import { ArticleForm } from "@/components/admin/ArticleForm";
@@ -18,7 +18,7 @@ export default async function NewArticlePage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!dbConfigured()) return <NoDbNotice />;
   const sp = await searchParams;
   return (
@@ -27,7 +27,7 @@ export default async function NewArticlePage({
         <Toast type="error" message={ERR[sp.error] ?? "오류가 발생했습니다."} />
       )}
       <h1 className="mb-6 text-2xl font-extrabold">새 기사 작성</h1>
-      <ArticleForm action={createArticleAction} />
+      <ArticleForm action={createArticleAction} canPublish={canPublish(session)} />
     </div>
   );
 }
