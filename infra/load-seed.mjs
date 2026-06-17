@@ -85,11 +85,13 @@ for (let i = 0; i < rows.length; i += BATCH) {
 // ⚠️ 필수: 명시 id 로 적재했으므로 identity 시퀀스를 MAX(id) 로 전진시킨다.
 // (안 하면 신규 발행 시 id=1 부터 시작해 기존 행과 PK 충돌)
 // 3-인자 setval: 빈 테이블이면 is_called=false 로 두어 첫 id 가 1 이 되게 한다.
+// id < 1,000,000 (넷프로 wr_id·관리자 발행분)만 기준 — 외부 인제스트의 고-id(예: 인천시청
+// 보도자료 ~1500만대)가 관리자 발행 시퀀스를 끌어올리지 않도록 제외.
 await sql.query(
   `SELECT setval(
      pg_get_serial_sequence('articles', 'id'),
-     GREATEST(COALESCE((SELECT MAX(id) FROM articles), 1), 1),
-     (SELECT COUNT(*) FROM articles) > 0
+     GREATEST(COALESCE((SELECT MAX(id) FROM articles WHERE id < 1000000), 1), 1),
+     (SELECT COUNT(*) FROM articles WHERE id < 1000000) > 0
    )`,
 );
 
