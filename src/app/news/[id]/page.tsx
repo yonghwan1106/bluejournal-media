@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getArticle, getAllIds, getRelated } from "@/lib/articles";
 import { rewriteBodyImages, resolveImg } from "@/lib/media";
+import { sanitizeBodyHtml } from "@/lib/sanitize";
 import { formatDateTime } from "@/lib/format";
 import { ArticleCard } from "@/components/ArticleCard";
 
@@ -48,7 +49,7 @@ export default async function ArticlePage({
   const a = await getArticle(Number(id));
   if (!a) notFound();
 
-  const body = rewriteBodyImages(a.bodyHtml);
+  const body = sanitizeBodyHtml(rewriteBodyImages(a.bodyHtml));
   const related = await getRelated(a);
 
   return (
