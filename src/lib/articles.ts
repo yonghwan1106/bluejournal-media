@@ -94,7 +94,7 @@ function fromFull(r: Row): SeedArticle {
   };
 }
 
-const useDb = () => !!process.env.DATABASE_URL;
+const hasDatabaseUrl = () => !!process.env.DATABASE_URL;
 
 // publishedAt 내림차순(NULL 마지막) + id 내림차순 tie-breaker → 양 경로 결정적 동일 정렬
 const pubOrder = dsql`${articles.publishedAt} desc nulls last, ${articles.id} desc`;
@@ -105,7 +105,7 @@ const pubOrder = dsql`${articles.publishedAt} desc nulls last, ${articles.id} de
  * (스테일 시드 스냅샷을 캐시에 덮어쓰지 않도록). DATABASE_URL 미설정(프리뷰)이면 항상 시드.
  */
 async function viaDb<T>(run: () => Promise<T>, fallback: () => T): Promise<T> {
-  if (!useDb()) return fallback();
+  if (!hasDatabaseUrl()) return fallback();
   try {
     return await run();
   } catch (e) {

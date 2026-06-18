@@ -58,7 +58,15 @@ export function RichEditor({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [recover, setRecover] = useState<string | null>(null);
+  const [recover, setRecover] = useState<string | null>(() => {
+    if (!storageKey || typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem(`bj_draft_${storageKey}`);
+      return saved && saved !== (initialHTML || "") ? saved : null;
+    } catch {
+      return null;
+    }
+  });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function handleImageFile(file: File, editor: Editor | null) {
@@ -125,20 +133,11 @@ export function RichEditor({
     },
   });
 
-  // 자동저장 복구: 저장 안 한 이전 작성분이 있으면 안내
   useEffect(() => {
-    if (!editor || !storageKey) return;
-    try {
-      const saved = localStorage.getItem(`bj_draft_${storageKey}`);
-      if (saved && saved !== (initialHTML || "") && saved !== editor.getHTML()) {
-        setRecover(saved);
-      }
-    } catch {
-      /* 무시 */
-    }
-    // editor 준비 시 1회만
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor]);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
 
   const setLink = () => {
     if (!editor) return;

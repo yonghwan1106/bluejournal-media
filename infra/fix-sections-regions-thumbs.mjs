@@ -45,9 +45,15 @@ let sec = 0,
 // 1·2) 섹션 + 지역 (동기)
 for (const a of seed) {
   if (TAMSA.has(a.id)) {
-    if (a.section !== "탐사문학") (a.section = "탐사문학"), sec++;
+    if (a.section !== "탐사문학") {
+      a.section = "탐사문학";
+      sec++;
+    }
   } else if (TEUKJIP.has(a.id)) {
-    if (a.section !== "특집") (a.section = "특집"), sec++;
+    if (a.section !== "특집") {
+      a.section = "특집";
+      sec++;
+    }
   }
   if (a.region === "서울") {
     a.region = regionNoSeoul(a.title || "");
