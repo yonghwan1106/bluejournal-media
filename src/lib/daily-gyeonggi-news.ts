@@ -66,13 +66,23 @@ export type DailyGyeonggiNewsResult = {
     source: string;
     title: string;
     sourceUrl: string;
-    status: "published" | "skip_existing" | "dry_run" | "failed";
+    status: "published" | "skip_existing" | "skip_no_image" | "dry_run" | "failed";
     id?: number;
     url?: string;
     reason?: string;
   }>;
   exclusions: Array<{ source: string; reason: string; latest?: string }>;
 };
+
+class SkipArticleError extends Error {
+  constructor(
+    public readonly status: "skip_no_image",
+    message: string,
+  ) {
+    super(message);
+    this.name = "SkipArticleError";
+  }
+}
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -361,9 +371,6 @@ async function scanGnews(date: string): Promise<{ items: SourceItem[]; latest?: 
       sourceUrl: href,
       listedTitle: title,
       listedDate: d,
-      fallbackImageUrl:
-        "https://gnews.gg.go.kr/OP_UPDATA/UP_DATA/_NAMO_FILE/images/000045/2_%EA%B2%BD%EA%B8%B0%EB%8F%84%EC%B2%AD_%EC%8B%A0%EC%B2%AD%EC%82%AC_%EC%A0%84%EA%B2%BD._%E2%93%92_%EA%B2%BD%EA%B8%B0%EB%8F%84%EC%B2%AD.jpg",
-      fallbackImageAlt: "경기도청 신청사 전경. 경기도청",
     });
   });
   return { items, latest: latestDateFromText($.root().text()) };
@@ -832,6 +839,10 @@ async function extractArticle(
   }
 
   const sourceImage = imageUrl || item.fallbackImageUrl || null;
+  if (!sourceImage) {
+    throw new SkipArticleError("skip_no_image", "이미지 없는 자료 제외");
+  }
+
   const effectiveImage = options.mirrorAssets
     ? await mirrorImage(sourceImage, `${date}/${item.key}`)
     : sourceImage;
@@ -1016,6 +1027,18 @@ export async function runDailyGyeonggiNews(
         url: `/news/${id}`,
       });
     } catch (error) {
+      if (error instanceof SkipArticleError) {
+        result.skipped++;
+        result.results.push({
+          key: item.key,
+          source: item.source,
+          title: item.listedTitle,
+          sourceUrl: item.sourceUrl,
+          status: error.status,
+          reason: error.message,
+        });
+        continue;
+      }
       result.failed++;
       result.results.push({
         key: item.key,
