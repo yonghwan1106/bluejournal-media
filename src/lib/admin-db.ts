@@ -45,6 +45,8 @@ export type ListResult = {
   pages: number;
 };
 
+const adminArticleOrder = sql`${articles.publishedAt} desc nulls last, ${articles.id} desc`;
+
 /** 관리자 기사 목록 — 휴지통 분리 + 검색(제목)·필터(상태/섹션/지역)·페이지네이션. */
 export async function adminListArticles(params: ListParams = {}): Promise<ListResult> {
   const page = Math.max(1, params.page ?? 1);
@@ -64,7 +66,7 @@ export async function adminListArticles(params: ListParams = {}): Promise<ListRe
     .select()
     .from(articles)
     .where(where)
-    .orderBy(desc(articles.id))
+    .orderBy(adminArticleOrder)
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   const [{ c }] = await db.select({ c: count() }).from(articles).where(where);
