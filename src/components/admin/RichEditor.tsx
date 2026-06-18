@@ -7,11 +7,13 @@ import { TableKit } from "@tiptap/extension-table";
 import Youtube from "@tiptap/extension-youtube";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "./MediaLibrary";
+import { resizeImageForUpload } from "@/lib/image-resize";
 
 async function uploadImage(file: File): Promise<string | null> {
   const fd = new FormData();
   fd.append("file", file);
   const r = await fetch("/api/admin/upload", { method: "POST", body: fd });
+  if (!r.ok) return null;
   const j = await r.json().catch(() => ({}));
   return j.url ?? null;
 }
@@ -73,8 +75,13 @@ export function RichEditor({
     if (!editor || !file.type.startsWith("image/")) return;
     setUploading(true);
     try {
-      const url = await uploadImage(file);
+      const toSend = await resizeImageForUpload(file);
+      const url = await uploadImage(toSend);
       if (url) editor.chain().focus().setImage({ src: url }).run();
+      else
+        window.alert(
+          "이미지 업로드에 실패했습니다. 용량이 큰 경우 더 작은 이미지를 사용해 주세요.",
+        );
     } finally {
       setUploading(false);
     }

@@ -5,6 +5,7 @@ import type { Article } from "@/db/schema";
 import { toKstInput } from "@/lib/format";
 import { RichEditor } from "./RichEditor";
 import { MediaLibrary } from "./MediaLibrary";
+import { resizeImageForUpload } from "@/lib/image-resize";
 
 const field = "w-full rounded-md border border-line px-3 py-2 outline-none focus:border-brand";
 const labelCls = "block text-sm font-bold mb-1";
@@ -32,9 +33,18 @@ export function ArticleForm({
     setUploading(true);
     setUploadMsg("");
     try {
+      const toSend = await resizeImageForUpload(file);
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", toSend);
       const r = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      if (!r.ok) {
+        setUploadMsg(
+          r.status === 413
+            ? "이미지 용량이 너무 큽니다(4.5MB 초과). 더 작은 이미지를 사용하세요."
+            : `업로드 실패 (${r.status})`,
+        );
+        return;
+      }
       const j = await r.json();
       if (j.url) {
         setThumb(j.url);
