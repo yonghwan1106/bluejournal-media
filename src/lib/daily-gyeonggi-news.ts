@@ -51,12 +51,14 @@ export type DailyGyeonggiNewsOptions = {
   date?: string;
   dryRun?: boolean;
   limit?: number;
+  publishedAtTime?: string;
 };
 
 export type DailyGyeonggiNewsResult = {
   date: string;
   dryRun: boolean;
   scannedAt: string;
+  publishedAtTime: string;
   scanned: number;
   published: number;
   skipped: number;
@@ -112,6 +114,14 @@ function dotDate(date: string): string {
 
 function slashDate(date: string): string {
   return date.replace(/-/g, "/");
+}
+
+function normalizePublishTime(value: string | undefined): string {
+  const match = value?.match(/^(\d{1,2}):(\d{2})$/);
+  const hour = match ? Number(match[1]) : 8;
+  const minute = match ? Number(match[2]) : 40;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return "08:40";
+  return `${pad(hour)}:${pad(minute)}`;
 }
 
 function normalizeDateToken(value: string | null | undefined): string {
@@ -973,12 +983,14 @@ export async function runDailyGyeonggiNews(
   const date = options.date ?? todayKst();
   const dryRun = options.dryRun ?? false;
   const scannedAt = kstNowIso();
+  const publishedAtTime = normalizePublishTime(options.publishedAtTime);
   const { items, exclusions } = await scanSources(date);
   const selected = typeof options.limit === "number" ? items.slice(0, options.limit) : items;
   const result: DailyGyeonggiNewsResult = {
     date,
     dryRun,
     scannedAt,
+    publishedAtTime,
     scanned: selected.length,
     published: 0,
     skipped: 0,
@@ -986,7 +998,7 @@ export async function runDailyGyeonggiNews(
     results: [],
     exclusions,
   };
-  const publishedAt = new Date(`${date}T08:40:00+09:00`);
+  const publishedAt = new Date(`${date}T${publishedAtTime}:00+09:00`);
 
   for (const item of selected) {
     try {

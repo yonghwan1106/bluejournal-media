@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/gyeonggi-news",
       "schedule": "40 23 * * *"
+    },
+    {
+      "path": "/api/cron/gyeonggi-news-followup",
+      "schedule": "30 0 * * *"
     }
   ]
 }
