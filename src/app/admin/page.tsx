@@ -129,6 +129,18 @@ export default async function AdminHome({
               + 새 기사
             </Link>
           )}
+          <Link
+            href="/admin/stats"
+            className="rounded-md border border-line px-4 py-2 text-sm font-bold text-muted hover:text-ink"
+          >
+            📊 통계
+          </Link>
+          <Link
+            href="/admin/health"
+            className="rounded-md border border-line px-4 py-2 text-sm font-bold text-muted hover:text-ink"
+          >
+            🩺 수집현황
+          </Link>
           {canMgr && (
             <Link
               href="/admin/users"

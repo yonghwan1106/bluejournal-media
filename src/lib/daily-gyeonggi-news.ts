@@ -5,7 +5,7 @@ import { and, eq, gte, lt, or } from "drizzle-orm";
 import { request as httpsRequest } from "node:https";
 import { getDb } from "@/db";
 import { articles, type NewArticle } from "@/db/schema";
-import { adminCreateArticle } from "@/lib/admin-db";
+import { adminCreateArticle, recordCronRun } from "@/lib/admin-db";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 BluejournalCron/1.0";
@@ -1106,5 +1106,37 @@ export async function runDailyGyeonggiNews(
       });
     }
   }
+
+  // 기관별 실행 결과를 cron_runs 에 기록(헬스 대시보드용). dryRun 제외, 베스트에포트.
+  if (!dryRun) {
+    const byAgency = new Map<
+      string,
+      { fetched: number; published: number; skipped: number; failed: number; errorText: string | null }
+    >();
+    const bump = (agency: string) => {
+      let a = byAgency.get(agency);
+      if (!a) {
+        a = { fetched: 0, published: 0, skipped: 0, failed: 0, errorText: null };
+        byAgency.set(agency, a);
+      }
+      return a;
+    };
+    for (const r of result.results) {
+      const a = bump(r.source);
+      a.fetched++;
+      if (r.status === "published") a.published++;
+      else if (r.status === "failed") a.failed++;
+      else a.skipped++;
+    }
+    for (const ex of result.exclusions) {
+      if (ex.reason.startsWith("스캔 실패")) bump(ex.source).errorText = ex.reason.slice(0, 500);
+    }
+    try {
+      await recordCronRun([...byAgency].map(([sourceAgency, v]) => ({ sourceAgency, ...v })));
+    } catch (e) {
+      console.error("[cron] 헬스 기록 실패:", e);
+    }
+  }
+
   return result;
 }

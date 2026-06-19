@@ -24,6 +24,8 @@ export type SeedArticle = {
   viewCount: number;
   status: "published" | "draft" | "hidden";
   publishedAt: string | null;
+  metaDescription?: string | null;
+  ogImage?: string | null;
   brokenImages?: number;
 };
 
@@ -91,6 +93,8 @@ function fromFull(r: Row): SeedArticle {
     ...fromCard(r),
     bodyHtml: r.bodyHtml ?? "",
     bodyText: r.bodyText,
+    metaDescription: r.metaDescription,
+    ogImage: r.ogImage,
   };
 }
 

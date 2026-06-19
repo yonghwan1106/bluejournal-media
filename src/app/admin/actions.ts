@@ -65,6 +65,9 @@ function parseForm(fd: FormData): Omit<NewArticle, "id"> {
     return v == null || v === "" ? null : String(v);
   };
   const body = String(fd.get("bodyHtml") ?? "");
+  const plain = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const subtitle = str("subtitle");
+  const thumbnailUrl = str("thumbnailUrl");
   const tags = (str("tags") ?? "")
     .split(",")
     .map((t) => t.trim().replace(/^#/, ""))
@@ -73,20 +76,21 @@ function parseForm(fd: FormData): Omit<NewArticle, "id"> {
   return {
     board: "news",
     title: String(fd.get("title") ?? "").trim(),
-    subtitle: str("subtitle"),
+    subtitle,
     reporterName: str("reporterName") ?? "경인블루저널",
     reporterEmail: null,
     section: str("section") ?? "뉴스",
     region: str("region"),
     displaySlot: str("displaySlot"),
-    thumbnailUrl: str("thumbnailUrl"),
+    thumbnailUrl,
     bodyHtml: body,
-    bodyText:
-      body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 400) ||
-      null,
+    bodyText: plain.slice(0, 400) || null,
     source: str("source"),
     sourceUrl: str("sourceUrl"),
     tags,
+    // SEO·공유 메타: 입력 없으면 부제 → 본문 앞부분으로 자동 채움. OG 이미지=대표이미지.
+    metaDescription: str("metaDescription") || subtitle || plain.slice(0, 150) || null,
+    ogImage: thumbnailUrl,
     // viewCount 제외(수정 시 0 덮어쓰기 방지), status 는 권한에 따라 액션에서 보정
     status: normStatus(str("status"), "draft"),
     publishedAt: pub ? kstInputToDate(pub) : new Date(),

@@ -6,6 +6,7 @@ import { toKstInput } from "@/lib/format";
 import { RichEditor } from "./RichEditor";
 import { MediaLibrary } from "./MediaLibrary";
 import { resizeImageForUpload } from "@/lib/image-resize";
+import { SeoChecklist } from "./SeoChecklist";
 
 const field = "w-full rounded-md border border-line px-3 py-2 outline-none focus:border-brand";
 const labelCls = "block text-sm font-bold mb-1";
@@ -23,6 +24,8 @@ export function ArticleForm({
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
   const [body, setBody] = useState(article?.bodyHtml ?? "");
+  const [title, setTitle] = useState(article?.title ?? "");
+  const [metaDescription, setMetaDescription] = useState(article?.metaDescription ?? "");
   const storageKey = article ? String(article.id) : "new";
 
   const pubDate = article?.publishedAt ? new Date(article.publishedAt) : new Date();
@@ -73,7 +76,13 @@ export function ArticleForm({
     >
       <div>
         <label className={labelCls}>제목 *</label>
-        <input name="title" required defaultValue={article?.title ?? ""} className={field} />
+        <input
+          name="title"
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className={field}
+        />
       </div>
       <div>
         <label className={labelCls}>부제목</label>
@@ -161,6 +170,23 @@ export function ArticleForm({
         />
         <input type="hidden" name="bodyHtml" value={body} />
       </div>
+
+      <div>
+        <label className={labelCls}>
+          메타설명{" "}
+          <span className="font-normal text-muted">(검색·공유 요약 — 비우면 자동 생성)</span>
+        </label>
+        <textarea
+          name="metaDescription"
+          value={metaDescription}
+          onChange={(e) => setMetaDescription(e.target.value)}
+          rows={2}
+          placeholder="비워두면 부제·본문 앞부분으로 자동 생성됩니다."
+          className={field}
+        />
+      </div>
+
+      <SeoChecklist title={title} thumb={thumb} bodyHtml={body} metaDescription={metaDescription} />
 
       <div className="grid grid-cols-2 gap-4">
         <div>

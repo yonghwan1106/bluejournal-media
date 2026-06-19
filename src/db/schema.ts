@@ -6,6 +6,7 @@ import {
   text,
   jsonb,
   timestamp,
+  date,
   index,
 } from "drizzle-orm/pg-core";
 
@@ -70,6 +71,9 @@ export const articles = pgTable(
     deletedAt: ts("deleted_at"),
     // 작성자(users.id) — 기자 권한(자기 글만 편집) 판정용. 기존/외부 기사는 null.
     authorId: integer("author_id"),
+    // SEO·공유 메타. 비어 있으면 발행 시 본문/대표이미지로 자동 채움.
+    metaDescription: varchar("meta_description", { length: 300 }),
+    ogImage: varchar("og_image", { length: 1000 }),
   },
   (t) => [
     index("section_idx").on(t.section),
@@ -159,5 +163,48 @@ export const articleRevisions = pgTable(
   (t) => [index("rev_article_idx").on(t.articleId)],
 );
 
+/**
+ * 페이지 방문 이벤트(일/주/월 접속자 통계용).
+ * 개인정보 비식별: IP·UA 원문·전체 referrer·쿠키 미저장. visitor_hash 는
+ * SHA-256(ip+ua+day+salt)로 날짜가 솔트에 포함돼 일별 익명 유니크 근사만 가능.
+ * 90일 경과 행은 cron 으로 정리(daily 롤업은 후속).
+ */
+export const pageViews = pgTable(
+  "page_views",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    day: date("day").notNull(), // KST 기준 날짜(집계 키)
+    path: varchar("path", { length: 500 }).notNull(),
+    articleId: integer("article_id"), // 기사 페이지만 채움
+    visitorHash: varchar("visitor_hash", { length: 64 }).notNull(),
+    referrerHost: varchar("referrer_host", { length: 255 }), // 도메인만
+    device: varchar("device", { length: 20 }), // 'mobile' | 'desktop'
+    createdAt: ts("created_at").defaultNow(),
+  },
+  (t) => [
+    index("pv_day_idx").on(t.day),
+    index("pv_article_day_idx").on(t.articleId, t.day),
+  ],
+);
+
+/** 자동수집 cron 실행 로그(기관별 1행) — 헬스 대시보드용. */
+export const cronRuns = pgTable(
+  "cron_runs",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    runAt: ts("run_at").defaultNow(),
+    job: varchar("job", { length: 50 }).notNull().default("gyeonggi-news"),
+    sourceAgency: varchar("source_agency", { length: 100 }).notNull(),
+    fetched: integer("fetched").notNull().default(0),
+    published: integer("published").notNull().default(0),
+    skipped: integer("skipped").notNull().default(0),
+    failed: integer("failed").notNull().default(0),
+    errorText: text("error_text"),
+  },
+  (t) => [index("cron_runs_runat_idx").on(t.runAt)],
+);
+
 export type Article = typeof articles.$inferSelect;
 export type NewArticle = typeof articles.$inferInsert;
+export type PageView = typeof pageViews.$inferInsert;
+export type CronRun = typeof cronRuns.$inferSelect;

@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
-/** 공개 기사 페이지 마운트 시 조회수 1회 증가(세션당 1회 — 새로고침 중복 완화). */
-export function ViewBeacon({ id }: { id: number }) {
+/**
+ * 전역 방문 비콘. 공용 레이아웃에 1개 배치 → 모든 공개 페이지(홈/섹션/지역/기사)에서
+ * 경로 이동 시 1회 POST /api/view{path, referrer}. 세션·경로당 1회(새로고침 중복 완화).
+ * 관리자 경로는 전송하지 않는다. 서버에서 봇·경로 필터 + 익명 집계.
+ */
+export function ViewBeacon() {
+  const pathname = usePathname();
   useEffect(() => {
-    const key = `bj_viewed_${id}`;
+    if (!pathname || pathname.startsWith("/admin")) return;
+    const key = `bj_pv_${pathname}`;
     try {
       if (sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, "1");
@@ -15,9 +22,9 @@ export function ViewBeacon({ id }: { id: number }) {
     fetch("/api/view", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ path: pathname, referrer: document.referrer || "" }),
       keepalive: true,
     }).catch(() => {});
-  }, [id]);
+  }, [pathname]);
   return null;
 }

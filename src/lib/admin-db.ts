@@ -14,11 +14,14 @@ import { getDb } from "@/db";
 import {
   articles,
   articleRevisions,
+  pageViews,
+  cronRuns,
   users,
   type NewArticle,
   type Article,
 } from "@/db/schema";
 import { hashPassword, type Role } from "@/lib/auth";
+import { referrerCategory, type RefCategory } from "@/lib/analytics";
 
 export function dbConfigured(): boolean {
   return !!process.env.DATABASE_URL;
@@ -299,4 +302,151 @@ export async function createUser(data: {
 
 export async function deleteUser(id: number): Promise<void> {
   await getDb().delete(users).where(eq(users.id, id));
+}
+
+// ───────── 접속 통계(page_views) ─────────
+
+export type StatUnit = "day" | "week" | "month";
+
+const sinceDays = (n: number) => sql`${pageViews.day} >= (current_date - ${n}::int)`;
+
+/** 기간 합계 + 직전 동기간(증감률 계산용). */
+export async function statsSummary(days: number) {
+  const db = getDb();
+  const sel = {
+    pv: sql<number>`count(*)::int`,
+    uv: sql<number>`count(distinct ${pageViews.visitorHash})::int`,
+  };
+  const [cur] = await db.select(sel).from(pageViews).where(sinceDays(days));
+  const [prev] = await db
+    .select(sel)
+    .from(pageViews)
+    .where(
+      sql`${pageViews.day} >= (current_date - ${days * 2}::int) and ${pageViews.day} < (current_date - ${days}::int)`,
+    );
+  return {
+    pv: Number(cur?.pv ?? 0),
+    uv: Number(cur?.uv ?? 0),
+    prevPv: Number(prev?.pv ?? 0),
+    prevUv: Number(prev?.uv ?? 0),
+  };
+}
+
+/** 일/주/월 버킷별 PV·UV 추이. */
+export async function statsTrend(unit: StatUnit, days: number) {
+  const bucket =
+    unit === "day"
+      ? sql`${pageViews.day}`
+      : sql`date_trunc(${unit}, ${pageViews.day})::date`;
+  const rows = await getDb()
+    .select({
+      bucket: sql<string>`${bucket}`,
+      pv: sql<number>`count(*)::int`,
+      uv: sql<number>`count(distinct ${pageViews.visitorHash})::int`,
+    })
+    .from(pageViews)
+    .where(sinceDays(days))
+    .groupBy(bucket)
+    .orderBy(bucket);
+  return rows.map((r) => ({ bucket: String(r.bucket).slice(0, 10), pv: Number(r.pv), uv: Number(r.uv) }));
+}
+
+/** 기간 내 조회 많은 기사(누적 아닌 기간 합계). */
+export async function statsTopArticles(days: number, limit = 10) {
+  const rows = await getDb()
+    .select({
+      id: articles.id,
+      title: articles.title,
+      section: articles.section,
+      region: articles.region,
+      views: sql<number>`count(*)::int`,
+    })
+    .from(pageViews)
+    .innerJoin(articles, eq(pageViews.articleId, articles.id))
+    .where(and(sinceDays(days), isNull(articles.deletedAt)))
+    .groupBy(articles.id, articles.title, articles.section, articles.region)
+    .orderBy(desc(sql`count(*)`))
+    .limit(limit);
+  return rows.map((r) => ({ ...r, views: Number(r.views) }));
+}
+
+/** 섹션별 기간 조회 합계. */
+export async function statsTopSections(days: number) {
+  const rows = await getDb()
+    .select({ section: articles.section, views: sql<number>`count(*)::int` })
+    .from(pageViews)
+    .innerJoin(articles, eq(pageViews.articleId, articles.id))
+    .where(and(sinceDays(days), isNull(articles.deletedAt)))
+    .groupBy(articles.section)
+    .orderBy(desc(sql`count(*)`));
+  return rows.map((r) => ({ section: r.section, views: Number(r.views) }));
+}
+
+/** 유입경로 분류 비중(검색/SNS/직접/기타). */
+export async function statsReferrers(days: number): Promise<Record<RefCategory, number>> {
+  const rows = await getDb()
+    .select({ host: pageViews.referrerHost, c: sql<number>`count(*)::int` })
+    .from(pageViews)
+    .where(sinceDays(days))
+    .groupBy(pageViews.referrerHost);
+  const cat: Record<RefCategory, number> = { 검색: 0, SNS: 0, 직접: 0, 기타: 0 };
+  for (const r of rows) cat[referrerCategory(r.host)] += Number(r.c);
+  return cat;
+}
+
+/** 디바이스(모바일/데스크톱) 비율. */
+export async function statsDevices(days: number) {
+  const rows = await getDb()
+    .select({ device: pageViews.device, c: sql<number>`count(*)::int` })
+    .from(pageViews)
+    .where(sinceDays(days))
+    .groupBy(pageViews.device);
+  return rows.map((r) => ({ device: (r.device as string) ?? "기타", count: Number(r.c) }));
+}
+
+// ───────── 자동수집 cron 헬스 ─────────
+
+export async function recordCronRun(
+  entries: {
+    job?: string;
+    sourceAgency: string;
+    fetched?: number;
+    published?: number;
+    skipped?: number;
+    failed?: number;
+    errorText?: string | null;
+  }[],
+): Promise<void> {
+  if (!entries.length) return;
+  await getDb()
+    .insert(cronRuns)
+    .values(
+      entries.map((r) => ({
+        job: r.job ?? "gyeonggi-news",
+        sourceAgency: r.sourceAgency,
+        fetched: r.fetched ?? 0,
+        published: r.published ?? 0,
+        skipped: r.skipped ?? 0,
+        failed: r.failed ?? 0,
+        errorText: r.errorText ?? null,
+      })),
+    );
+}
+
+/** 최근 7일 cron 실행 로그(기관 헬스 신호등용, 최신순). */
+export async function cronHealth() {
+  return getDb()
+    .select({
+      agency: cronRuns.sourceAgency,
+      runAt: cronRuns.runAt,
+      fetched: cronRuns.fetched,
+      published: cronRuns.published,
+      skipped: cronRuns.skipped,
+      failed: cronRuns.failed,
+      errorText: cronRuns.errorText,
+    })
+    .from(cronRuns)
+    .where(sql`${cronRuns.runAt} >= now() - interval '7 days'`)
+    .orderBy(desc(cronRuns.runAt))
+    .limit(200);
 }
