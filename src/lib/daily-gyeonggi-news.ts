@@ -898,6 +898,48 @@ function mediaExt(contentType: string, url: string): string {
   return url.match(/\.(png|gif|webp|jpe?g)(?:\?|$)/i)?.[1]?.replace("jpeg", "jpg") || "jpg";
 }
 
+/**
+ * 이미지 바이트 취득. 1차 일반 fetch, 실패 시(자체서명/불완전 인증서 사이트 —
+ * 예: seongnam.go.kr) 인증서 검증을 끈 https 요청으로 폴백한다(본문 fetch 의
+ * fetchTextWithInsecureCert 와 동일 취지). 둘 다 실패하면 null.
+ */
+async function fetchImageBuffer(
+  url: string,
+): Promise<{ buf: Buffer; contentType: string } | null> {
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": UA }, cache: "no-store" });
+    if (res.ok) {
+      return {
+        buf: Buffer.from(await res.arrayBuffer()),
+        contentType: res.headers.get("content-type") || "image/jpeg",
+      };
+    }
+  } catch {
+    /* TLS 오류 등 → insecure 폴백 */
+  }
+  if (!url.startsWith("https:")) return null;
+  return new Promise((resolve) => {
+    const req = httpsRequest(
+      url,
+      { headers: { "User-Agent": UA }, rejectUnauthorized: false },
+      (res) => {
+        const status = res.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+          resolve(null);
+          return;
+        }
+        const ctRaw = res.headers["content-type"] || "image/jpeg";
+        const contentType = Array.isArray(ctRaw) ? ctRaw[0] : ctRaw;
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+        res.on("end", () => resolve({ buf: Buffer.concat(chunks), contentType }));
+      },
+    );
+    req.on("error", () => resolve(null));
+    req.end();
+  });
+}
+
 async function mirrorImage(imageUrl: string | null, keyBase: string): Promise<string | null> {
   if (!imageUrl) return null;
   const {
@@ -912,10 +954,9 @@ async function mirrorImage(imageUrl: string | null, keyBase: string): Promise<st
     return imageUrl;
   }
   try {
-    const res = await fetch(imageUrl, { headers: { "User-Agent": UA }, cache: "no-store" });
-    if (!res.ok) return imageUrl;
-    const contentType = res.headers.get("content-type") || "image/jpeg";
-    const buf = Buffer.from(await res.arrayBuffer());
+    const got = await fetchImageBuffer(imageUrl);
+    if (!got) return imageUrl;
+    const { buf, contentType } = got;
     if (buf.length < 1000 || !contentType.startsWith("image/")) return imageUrl;
     const key = `data/external/gyeonggi-news/${slug(keyBase)}.${mediaExt(contentType, imageUrl)}`;
     const s3 = new S3Client({

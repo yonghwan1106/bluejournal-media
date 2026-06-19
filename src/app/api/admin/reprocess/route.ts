@@ -31,6 +31,24 @@ const TYPE_BY_SOURCE: Record<string, SourceType> = {
   화성특례시의회: "hwaseong_council",
 };
 
+// source(매체명)로 매핑 안 되면(옛 ETL 등 형식이 다른 경우) source_url 호스트로 type 추론
+function resolveType(source: string, url: string): SourceType | null {
+  if (TYPE_BY_SOURCE[source]) return TYPE_BY_SOURCE[source];
+  if (url.includes("gnews.gg.go.kr")) return "gnews";
+  if (url.includes("icouncil.go.kr")) return "incheon_council";
+  if (url.includes("incheon.go.kr")) return "incheon";
+  if (url.includes("council.suwon")) return "suwon_council";
+  if (url.includes("suwon.go.kr")) return "suwon";
+  if (url.includes("council.hscity")) return "hwaseong_council";
+  if (url.includes("hscity.go.kr")) return "hwaseong";
+  if (url.includes("council.yongin")) return "yongin_council";
+  if (url.includes("yongin.go.kr")) return "yongin";
+  if (url.includes("sncouncil.go.kr")) return "seongnam_council";
+  if (url.includes("seongnam.go.kr")) return "seongnam";
+  if (url.includes("ggc.go.kr")) return "ggc";
+  return null;
+}
+
 /**
  * 자동수집 기사 재처리(본문/이미지 재추출). 본문에 스크립트가 섞이는 등 파싱 오류로
  * 깨진 기사를 원문에서 다시 추출해 갱신한다. Bearer NEWS_API_KEY 보호.
@@ -53,7 +71,7 @@ export async function POST(req: Request) {
 
   const results: Array<Record<string, unknown>> = [];
   for (const r of rows) {
-    const type = TYPE_BY_SOURCE[r.source ?? ""];
+    const type = resolveType(r.source ?? "", r.sourceUrl ?? "");
     if (!type || !r.sourceUrl) {
       results.push({ id: r.id, status: "skip", reason: `type 불명(source=${r.source})` });
       continue;
