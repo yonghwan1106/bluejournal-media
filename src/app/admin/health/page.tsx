@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { dbConfigured, cronHealth } from "@/lib/admin-db";
+import { dbConfigured, cronHealth, listOpenScans } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
 import { formatDateTime } from "@/lib/format";
 
@@ -20,7 +20,7 @@ function signal(last: Row): { c: string; t: string } {
 export default async function HealthPage() {
   await requireAdmin();
   if (!dbConfigured()) return <NoDbNotice />;
-  const rows = await cronHealth();
+  const [rows, scans] = await Promise.all([cronHealth(), listOpenScans()]);
 
   // 기관별 그룹: 최신 실행(rows는 최신순) + 최근 7일 발행 합계
   const map = new Map<string, { last: Row; pub7: number; runs: number }>();
@@ -96,6 +96,30 @@ export default async function HealthPage() {
       <p className="mt-6 text-xs text-muted">
         🟢 정상 발행 · 🟡 수집됐으나 0건(당일 자료 없음일 수 있음) · 🔴 스캔 오류(사이트 변경·차단 가능) · ⚪ 36시간+ 무응답. 자동수집은 매일 새벽 실행됩니다.
       </p>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-sm font-bold">
+          🖼 깨진 이미지 점검 {scans.length > 0 && <span className="text-accent">({scans.length})</span>}
+        </h2>
+        {scans.length === 0 ? (
+          <p className="text-sm text-muted">깨진 이미지가 없습니다. (주간 자동 점검 + 발행 기사 R2 이미지 HEAD 검사)</p>
+        ) : (
+          <ul className="space-y-1.5 text-sm">
+            {scans.map((s) => (
+              <li key={s.id} className="flex items-center justify-between gap-3 border-b border-line pb-1.5">
+                <Link
+                  href={s.articleId ? `/admin/articles/${s.articleId}/edit` : "/admin/health"}
+                  className="truncate hover:text-brand"
+                >
+                  {s.articleId ? `#${s.articleId} ` : ""}
+                  {s.detail}
+                </Link>
+                <span className="hidden shrink-0 truncate text-xs text-muted sm:block sm:max-w-[40%]">{s.url}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

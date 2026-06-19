@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin, canPublish, canEditArticle } from "@/lib/auth";
-import { dbConfigured, adminGetArticle, listRevisions } from "@/lib/admin-db";
+import { dbConfigured, adminGetArticle, listRevisions, listSnippets } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
 import { ArticleForm } from "@/components/admin/ArticleForm";
 import { Toast } from "@/components/admin/Toast";
@@ -49,6 +49,7 @@ export default async function EditArticlePage({
     );
   }
   const revisions = await listRevisions(a.id);
+  const snippets = await listSnippets();
 
   const update = updateArticleAction.bind(null, a.id);
   const del = deleteArticleAction.bind(null, a.id);
@@ -73,7 +74,7 @@ export default async function EditArticlePage({
           <span className="text-sm text-muted">미게시(공개 미리보기 불가)</span>
         )}
       </div>
-      <ArticleForm article={a} action={update} canPublish={canPublish(session)} />
+      <ArticleForm article={a} action={update} canPublish={canPublish(session)} snippets={snippets} />
 
       {revisions.length > 0 && (
         <section className="mt-10 border-t border-line pt-6">

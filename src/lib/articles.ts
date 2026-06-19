@@ -22,10 +22,12 @@ export type SeedArticle = {
   sourceUrl: string | null;
   tags: string[];
   viewCount: number;
-  status: "published" | "draft" | "hidden";
+  status: "published" | "draft" | "hidden" | "scheduled";
   publishedAt: string | null;
   metaDescription?: string | null;
   ogImage?: string | null;
+  correctionNote?: string | null;
+  correctionAt?: string | null;
   brokenImages?: number;
 };
 
@@ -95,6 +97,8 @@ function fromFull(r: Row): SeedArticle {
     bodyText: r.bodyText,
     metaDescription: r.metaDescription,
     ogImage: r.ogImage,
+    correctionNote: r.correctionNote,
+    correctionAt: isoOrNull(r.correctionAt),
   };
 }
 

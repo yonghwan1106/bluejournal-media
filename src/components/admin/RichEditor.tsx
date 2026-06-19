@@ -53,10 +53,12 @@ export function RichEditor({
   initialHTML,
   onChange,
   storageKey,
+  snippets = [],
 }: {
   initialHTML: string;
   onChange: (html: string) => void;
   storageKey?: string;
+  snippets?: { id: number; label: string; html: string }[];
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -219,6 +221,25 @@ export function RichEditor({
           />
           <Btn title="표 삽입" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>▦ 표</Btn>
           <Btn title="영상(YouTube) 삽입" onClick={addYoutube}>▶ 영상</Btn>
+          {snippets.length > 0 && (
+            <select
+              defaultValue=""
+              title="스니펫 삽입"
+              className="rounded px-1.5 py-1 text-sm font-semibold text-ink hover:bg-brand-light"
+              onChange={(e) => {
+                const s = snippets.find((x) => String(x.id) === e.target.value);
+                if (s) editor.chain().focus().insertContent(s.html).run();
+                e.currentTarget.value = "";
+              }}
+            >
+              <option value="">🧩 스니펫</option>
+              {snippets.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          )}
           {uploading && <span className="ml-1 text-xs text-muted">업로드중…</span>}
           <Sep />
           <Btn title="실행취소" onClick={() => editor.chain().focus().undo().run()}>↶</Btn>

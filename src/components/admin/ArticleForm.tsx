@@ -15,10 +15,12 @@ export function ArticleForm({
   article,
   action,
   canPublish = true,
+  snippets = [],
 }: {
   article?: Article;
   action: (fd: FormData) => void | Promise<void>;
   canPublish?: boolean;
+  snippets?: { id: number; label: string; html: string }[];
 }) {
   const [thumb, setThumb] = useState(article?.thumbnailUrl ?? "");
   const [uploading, setUploading] = useState(false);
@@ -26,6 +28,7 @@ export function ArticleForm({
   const [body, setBody] = useState(article?.bodyHtml ?? "");
   const [title, setTitle] = useState(article?.title ?? "");
   const [metaDescription, setMetaDescription] = useState(article?.metaDescription ?? "");
+  const [correctionNote, setCorrectionNote] = useState(article?.correctionNote ?? "");
   const storageKey = article ? String(article.id) : "new";
 
   const pubDate = article?.publishedAt ? new Date(article.publishedAt) : new Date();
@@ -120,11 +123,14 @@ export function ArticleForm({
           <label className={labelCls}>상태</label>
           <select name="status" defaultValue={article?.status ?? "draft"} className={field}>
             {canPublish && <option value="published">출력중</option>}
+            {canPublish && <option value="scheduled">예약발행</option>}
             <option value="draft">대기</option>
             <option value="hidden">숨김</option>
           </select>
-          {!canPublish && (
+          {!canPublish ? (
             <p className="mt-1 text-xs text-muted">발행 권한이 없어 초안으로 저장됩니다(편집장 검토 후 발행).</p>
+          ) : (
+            <p className="mt-1 text-xs text-muted">예약발행 선택 시 아래 ‘등록일시’를 미래로 설정하면 그 시각에 자동 게시됩니다.</p>
           )}
         </div>
       </div>
@@ -167,6 +173,7 @@ export function ArticleForm({
           initialHTML={article?.bodyHtml ?? ""}
           onChange={setBody}
           storageKey={storageKey}
+          snippets={snippets}
         />
         <input type="hidden" name="bodyHtml" value={body} />
       </div>
@@ -187,6 +194,18 @@ export function ArticleForm({
       </div>
 
       <SeoChecklist title={title} thumb={thumb} bodyHtml={body} metaDescription={metaDescription} />
+
+      <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3">
+        <label className={labelCls}>정정·업데이트 고지</label>
+        <input
+          name="correctionNote"
+          value={correctionNote}
+          onChange={(e) => setCorrectionNote(e.target.value)}
+          placeholder="예: 기사 중 수치를 바로잡습니다. (입력 시 기사 상단에 정정 배너 표시)"
+          className={field}
+        />
+        <p className="mt-1 text-xs text-muted">입력하면 독자에게 기사 상단 정정 배너가 노출됩니다. 비우면 표시하지 않습니다.</p>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>

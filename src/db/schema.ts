@@ -18,6 +18,7 @@ export const articleStatus = pgEnum("article_status", [
   "published",
   "draft",
   "hidden",
+  "scheduled",
 ]);
 export const userRole = pgEnum("user_role", ["admin", "editor", "reporter"]);
 export const yn = pgEnum("yn", ["Y", "N"]);
@@ -74,6 +75,9 @@ export const articles = pgTable(
     // SEO·공유 메타. 비어 있으면 발행 시 본문/대표이미지로 자동 채움.
     metaDescription: varchar("meta_description", { length: 300 }),
     ogImage: varchar("og_image", { length: 1000 }),
+    // 정정/업데이트 고지(독자에게 기사 상단 배너로 노출)
+    correctionNote: varchar("correction_note", { length: 500 }),
+    correctionAt: ts("correction_at"),
   },
   (t) => [
     index("section_idx").on(t.section),
@@ -204,7 +208,44 @@ export const cronRuns = pgTable(
   (t) => [index("cron_runs_runat_idx").on(t.runAt)],
 );
 
+/** 뉴스레터 구독자. 더블옵트인(confirmed_at) + 원클릭 해지(unsubscribe_token). */
+export const subscribers = pgTable("subscribers", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  region: varchar("region", { length: 50 }), // 관심 지역(선택)
+  confirmedAt: ts("confirmed_at"), // null = 미확인(옵트인 대기)
+  unsubscribeToken: varchar("unsubscribe_token", { length: 64 }).notNull(),
+  createdAt: ts("created_at").defaultNow(),
+});
+
+/** 재사용 본문 스니펫(기자 서명·제보 안내 등). 에디터에서 삽입. */
+export const snippets = pgTable("snippets", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  label: varchar("label", { length: 100 }).notNull(),
+  html: text("html").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: ts("created_at").defaultNow(),
+});
+
+/** 품질 스캐너 결과(깨진 이미지·죽은 링크·고아 파일). */
+export const scanReports = pgTable(
+  "scan_reports",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    kind: varchar("kind", { length: 30 }).notNull(), // broken_image | dead_link | orphan_file
+    articleId: integer("article_id"),
+    url: varchar("url", { length: 1000 }),
+    detail: varchar("detail", { length: 500 }),
+    status: varchar("status", { length: 20 }).notNull().default("open"), // open | resolved | ignored
+    createdAt: ts("created_at").defaultNow(),
+  },
+  (t) => [index("scan_kind_idx").on(t.kind), index("scan_status_idx").on(t.status)],
+);
+
 export type Article = typeof articles.$inferSelect;
 export type NewArticle = typeof articles.$inferInsert;
 export type PageView = typeof pageViews.$inferInsert;
 export type CronRun = typeof cronRuns.$inferSelect;
+export type Subscriber = typeof subscribers.$inferSelect;
+export type Snippet = typeof snippets.$inferSelect;
+export type ScanReport = typeof scanReports.$inferSelect;

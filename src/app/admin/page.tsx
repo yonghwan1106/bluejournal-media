@@ -129,18 +129,6 @@ export default async function AdminHome({
               + 새 기사
             </Link>
           )}
-          <Link
-            href="/admin/stats"
-            className="rounded-md border border-line px-4 py-2 text-sm font-bold text-muted hover:text-ink"
-          >
-            📊 통계
-          </Link>
-          <Link
-            href="/admin/health"
-            className="rounded-md border border-line px-4 py-2 text-sm font-bold text-muted hover:text-ink"
-          >
-            🩺 수집현황
-          </Link>
           {canMgr && (
             <Link
               href="/admin/users"
@@ -168,7 +156,23 @@ export default async function AdminHome({
 
       {!trash && (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-5 flex flex-wrap gap-2 text-sm">
+            {[
+              { href: "/admin/stats", label: "📊 접속통계" },
+              { href: "/admin/calendar", label: "🗓 발행캘린더" },
+              { href: "/admin/health", label: "🩺 수집·점검" },
+              { href: "/admin/snippets", label: "🧩 스니펫" },
+            ].map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                className="rounded-md border border-line px-3 py-1.5 font-medium text-muted hover:border-brand hover:text-ink"
+              >
+                {t.label}
+              </Link>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {cards.map((c) => (
               <Link
                 key={c.label}

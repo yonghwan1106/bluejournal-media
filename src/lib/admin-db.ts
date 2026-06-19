@@ -16,6 +16,9 @@ import {
   articleRevisions,
   pageViews,
   cronRuns,
+  snippets,
+  subscribers,
+  scanReports,
   users,
   type NewArticle,
   type Article,
@@ -27,7 +30,7 @@ export function dbConfigured(): boolean {
   return !!process.env.DATABASE_URL;
 }
 
-export type ArticleStatus = "published" | "draft" | "hidden";
+export type ArticleStatus = "published" | "draft" | "hidden" | "scheduled";
 
 export type ListParams = {
   q?: string;
@@ -449,4 +452,113 @@ export async function cronHealth() {
     .where(sql`${cronRuns.runAt} >= now() - interval '7 days'`)
     .orderBy(desc(cronRuns.runAt))
     .limit(200);
+}
+
+// ───────── 본문 스니펫 ─────────
+
+export async function listSnippets() {
+  return getDb().select().from(snippets).orderBy(snippets.sortOrder, desc(snippets.id));
+}
+export async function createSnippet(label: string, html: string) {
+  await getDb().insert(snippets).values({ label, html });
+}
+export async function deleteSnippet(id: number) {
+  await getDb().delete(snippets).where(eq(snippets.id, id));
+}
+
+// ───────── 뉴스레터 구독자 ─────────
+
+export async function addSubscriber(email: string, region: string | null, token: string) {
+  await getDb()
+    .insert(subscribers)
+    .values({ email, region, unsubscribeToken: token })
+    .onConflictDoNothing();
+}
+export async function confirmSubscriber(token: string): Promise<string | null> {
+  const [row] = await getDb()
+    .update(subscribers)
+    .set({ confirmedAt: new Date() })
+    .where(eq(subscribers.unsubscribeToken, token))
+    .returning({ email: subscribers.email });
+  return row?.email ?? null;
+}
+export async function removeSubscriber(token: string): Promise<boolean> {
+  const rows = await getDb()
+    .delete(subscribers)
+    .where(eq(subscribers.unsubscribeToken, token))
+    .returning({ id: subscribers.id });
+  return rows.length > 0;
+}
+export async function listConfirmedSubscribers() {
+  return getDb().select().from(subscribers).where(isNotNull(subscribers.confirmedAt));
+}
+export async function subscriberStats() {
+  const [a] = await getDb().select({ c: count() }).from(subscribers).where(isNotNull(subscribers.confirmedAt));
+  const [b] = await getDb().select({ c: count() }).from(subscribers).where(isNull(subscribers.confirmedAt));
+  return { confirmed: Number(a.c), pending: Number(b.c) };
+}
+
+// ───────── 품질 스캔 ─────────
+
+export async function replaceOpenScans(
+  kind: string,
+  entries: { articleId?: number | null; url?: string | null; detail?: string | null }[],
+): Promise<void> {
+  const db = getDb();
+  await db.delete(scanReports).where(and(eq(scanReports.kind, kind), eq(scanReports.status, "open")));
+  if (entries.length) {
+    await db.insert(scanReports).values(
+      entries.map((e) => ({
+        kind,
+        articleId: e.articleId ?? null,
+        url: e.url ?? null,
+        detail: e.detail ?? null,
+      })),
+    );
+  }
+}
+export async function listOpenScans() {
+  return getDb()
+    .select()
+    .from(scanReports)
+    .where(eq(scanReports.status, "open"))
+    .orderBy(desc(scanReports.id))
+    .limit(300);
+}
+export async function resolveScan(id: number): Promise<void> {
+  await getDb().update(scanReports).set({ status: "resolved" }).where(eq(scanReports.id, id));
+}
+
+// ───────── 발행 캘린더 ─────────
+
+export async function listScheduled() {
+  return getDb()
+    .select({
+      id: articles.id,
+      title: articles.title,
+      section: articles.section,
+      region: articles.region,
+      publishedAt: articles.publishedAt,
+    })
+    .from(articles)
+    .where(and(eq(articles.status, "scheduled"), isNull(articles.deletedAt)))
+    .orderBy(articles.publishedAt);
+}
+
+/** 해당 월(KST) 발행/예약/대기 기사를 날짜·상태로 반환(캘린더 도트용). */
+export async function calendarMonth(year: number, month: number) {
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  return getDb()
+    .select({
+      day: sql<string>`to_char(${articles.publishedAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+      status: articles.status,
+    })
+    .from(articles)
+    .where(
+      and(
+        isNull(articles.deletedAt),
+        sql`(${articles.publishedAt} AT TIME ZONE 'Asia/Seoul') >= ${start}::date`,
+        sql`(${articles.publishedAt} AT TIME ZONE 'Asia/Seoul') < (${start}::date + interval '1 month')`,
+      ),
+    );
 }

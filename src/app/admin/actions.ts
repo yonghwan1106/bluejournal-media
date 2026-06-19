@@ -23,11 +23,13 @@ import {
   restoreRevision,
   createUser,
   deleteUser,
+  createSnippet,
+  deleteSnippet,
 } from "@/lib/admin-db";
 import { kstInputToDate } from "@/lib/format";
 import type { NewArticle } from "@/db/schema";
 
-const STATUSES = ["published", "draft", "hidden"] as const;
+const STATUSES = ["published", "draft", "hidden", "scheduled"] as const;
 type ArticleStatus = (typeof STATUSES)[number];
 /** 허용된 status 값만 통과 — 잘못된 값으로 인한 PG enum 제약 위반(500)을 방지. */
 function normStatus(v: unknown, fallback: ArticleStatus): ArticleStatus {
@@ -91,6 +93,9 @@ function parseForm(fd: FormData): Omit<NewArticle, "id"> {
     // SEO·공유 메타: 입력 없으면 부제 → 본문 앞부분으로 자동 채움. OG 이미지=대표이미지.
     metaDescription: str("metaDescription") || subtitle || plain.slice(0, 150) || null,
     ogImage: thumbnailUrl,
+    // 정정 고지: 사유 있으면 정정 시각을 저장 시점으로 기록.
+    correctionNote: str("correctionNote"),
+    correctionAt: str("correctionNote") ? new Date() : null,
     // viewCount 제외(수정 시 0 덮어쓰기 방지), status 는 권한에 따라 액션에서 보정
     status: normStatus(str("status"), "draft"),
     publishedAt: pub ? kstInputToDate(pub) : new Date(),
@@ -256,4 +261,33 @@ export async function deleteUserAction(formData: FormData) {
     }
   }
   redirect("/admin/users");
+}
+
+// ───────── 본문 스니펫(편집장·관리자) ─────────
+
+export async function createSnippetAction(formData: FormData) {
+  await requireRole(["admin", "editor"]);
+  const label = String(formData.get("label") ?? "").trim();
+  const html = String(formData.get("html") ?? "").trim();
+  if (label && html) {
+    try {
+      await createSnippet(label, html);
+    } catch (e) {
+      console.error("[snippet] 생성 실패:", e);
+    }
+  }
+  redirect("/admin/snippets");
+}
+
+export async function deleteSnippetAction(formData: FormData) {
+  await requireRole(["admin", "editor"]);
+  const id = Number(formData.get("id"));
+  if (Number.isFinite(id)) {
+    try {
+      await deleteSnippet(id);
+    } catch (e) {
+      console.error("[snippet] 삭제 실패:", e);
+    }
+  }
+  redirect("/admin/snippets");
 }

@@ -23,7 +23,8 @@ export async function generateMetadata({
   const { id } = await params;
   const a = await getArticle(Number(id));
   if (!a) return { title: "기사를 찾을 수 없습니다" };
-  const img = resolveImg(a.ogImage || a.thumbnailUrl);
+  // 대표이미지 있으면 그 사진, 없으면 동적 OG 카드(/api/og)로 폴백.
+  const img = resolveImg(a.ogImage || a.thumbnailUrl) || `/api/og?id=${a.id}`;
   const desc =
     a.metaDescription ?? a.subtitle ?? a.bodyText?.slice(0, 120) ?? undefined;
   return {
@@ -35,14 +36,14 @@ export async function generateMetadata({
       description: desc,
       type: "article",
       url: `/news/${a.id}`,
-      images: img ? [img] : undefined,
+      images: [img],
       publishedTime: a.publishedAt ?? undefined,
     },
     twitter: {
-      card: img ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: a.title,
       description: desc,
-      images: img ? [img] : undefined,
+      images: [img],
     },
   };
 }
@@ -82,6 +83,13 @@ export default async function ArticlePage({
           입력 {formatDateTime(a.publishedAt)}
         </time>
       </div>
+
+      {a.correctionNote && (
+        <div className="mt-5 rounded-md border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>정정·업데이트</strong>
+          {a.correctionAt ? ` · ${formatDateTime(a.correctionAt)}` : ""} — {a.correctionNote}
+        </div>
+      )}
 
       <div
         className="article-body mt-7"
