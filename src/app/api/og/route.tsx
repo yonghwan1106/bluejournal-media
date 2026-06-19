@@ -60,12 +60,12 @@ export async function GET(req: Request) {
           fontFamily: font ? "Noto" : "sans-serif",
         }}
       >
-        <div style={{ fontSize: 30, opacity: 0.92 }}>
+        <div style={{ display: "flex", fontSize: 30, opacity: 0.92 }}>
           경인블루저널 · {section}
           {region}
         </div>
         <div style={{ display: "flex", fontSize: 62, fontWeight: 700, lineHeight: 1.3 }}>{title}</div>
-        <div style={{ fontSize: 26, opacity: 0.85 }}>bluejournal.co.kr</div>
+        <div style={{ display: "flex", fontSize: 26, opacity: 0.85 }}>bluejournal.co.kr</div>
       </div>
     ),
     {
