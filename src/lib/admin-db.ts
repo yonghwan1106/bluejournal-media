@@ -562,3 +562,31 @@ export async function calendarMonth(year: number, month: number) {
       ),
     );
 }
+
+// ───────── 주간 다이제스트 요약 ─────────
+
+export async function weeklyDigest() {
+  const db = getDb();
+  const [pub] = await db
+    .select({ c: count() })
+    .from(articles)
+    .where(
+      and(
+        eq(articles.status, "published"),
+        isNull(articles.deletedAt),
+        sql`${articles.publishedAt} >= now() - interval '7 days'`,
+      ),
+    );
+  const [pv] = await db
+    .select({
+      pv: sql<number>`count(*)::int`,
+      uv: sql<number>`count(distinct ${pageViews.visitorHash})::int`,
+    })
+    .from(pageViews)
+    .where(sql`${pageViews.day} >= current_date - 7`);
+  return {
+    published7: Number(pub?.c ?? 0),
+    pv7: Number(pv?.pv ?? 0),
+    uv7: Number(pv?.uv ?? 0),
+  };
+}

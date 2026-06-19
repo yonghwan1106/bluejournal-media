@@ -160,8 +160,10 @@ export default async function AdminHome({
             {[
               { href: "/admin/stats", label: "📊 접속통계" },
               { href: "/admin/calendar", label: "🗓 발행캘린더" },
+              { href: "/admin/digest", label: "📋 다이제스트" },
               { href: "/admin/health", label: "🩺 수집·점검" },
               { href: "/admin/snippets", label: "🧩 스니펫" },
+              { href: "/admin/subscribers", label: "📧 구독자" },
             ].map((t) => (
               <Link
                 key={t.href}

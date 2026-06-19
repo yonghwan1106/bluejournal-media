@@ -16,6 +16,14 @@
     {
       "path": "/api/cron/scan",
       "schedule": "0 18 * * 0"
+    },
+    {
+      "path": "/api/cron/newsletter",
+      "schedule": "0 21 * * 4"
+    },
+    {
+      "path": "/api/cron/digest",
+      "schedule": "0 8 * * 1"
     }
   ]
 }

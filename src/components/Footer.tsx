@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { SITE } from "@/lib/site";
+import { SubscribeForm } from "@/components/SubscribeForm";
 
 export function Footer() {
   return (
     <footer className="mt-16 border-t border-line bg-[#f7f8fa]">
       <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-muted">
+        <div className="mb-6 rounded-lg border border-line bg-white p-4 sm:max-w-md">
+          <div className="text-sm font-bold text-ink">📧 경인블루저널 뉴스레터</div>
+          <p className="mb-2 mt-1 text-xs">매주 경기·인천 주요 소식을 메일로 받아보세요.</p>
+          <SubscribeForm />
+        </div>
         <div className="flex flex-wrap gap-x-4 gap-y-2 pb-5 text-xs font-medium text-ink">
           <Link href="/about" className="hover:text-brand">
             회사소개
