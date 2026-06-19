@@ -11,7 +11,7 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 BluejournalCron/1.0";
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
-type SourceType =
+export type SourceType =
   | "gnews"
   | "incheon"
   | "incheon_council"
@@ -25,7 +25,7 @@ type SourceType =
   | "seongnam_council"
   | "hwaseong_council";
 
-type SourceItem = {
+export type SourceItem = {
   key: string;
   type: SourceType;
   source: string;
@@ -748,13 +748,16 @@ function pickHwaseongCouncilDownload($: cheerio.CheerioAPI, base: string): strin
   return null;
 }
 
-async function extractArticle(
+export async function extractArticle(
   item: SourceItem,
   date: string,
   options: { mirrorAssets: boolean },
 ): Promise<ExtractedArticle> {
   const html = await fetchText(item.sourceUrl);
   const $ = cheerio.load(html);
+  // 인라인 <script>/<style> 텍스트가 본문(pageText)에 섞여 들어오는 것을 차단.
+  // (용인·경기 등 일부 소스는 본문 영역에 jQuery onready 스크립트가 포함됨)
+  $("script, style, noscript").remove();
   const pageText = cleanText($.root().text());
   const titleFromMeta =
     normalizeInline($("meta[property='og:title']").attr("content")) ||

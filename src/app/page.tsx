@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getLatest, getByRegion } from "@/lib/articles";
+import { getLatest, getByRegion, getBySection } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
 
 // ISR: 정적 캐시 후 최대 60초마다 백그라운드 재생성 (관리자 발행/수정은 revalidatePath 로 즉시 반영)
@@ -19,14 +19,17 @@ function SectionTitle({ title, href }: { title: string; href?: string }) {
 }
 
 export default async function Home() {
-  const top = await getLatest(17);
-  const headline = top[0];
-  const sub = top.slice(1, 5); // 주요뉴스
-  const latest = top.slice(5, 17); // 최신
-  const [gyeonggi, incheon] = await Promise.all([
+  const [featured, top, gyeonggi, incheon] = await Promise.all([
+    getBySection("특집", 1), // 히어로는 특집 최신 1건만
+    getLatest(18),
     getByRegion("경기", 8),
     getByRegion("인천", 8),
   ]);
+  // 히어로(헤드라인): 특집 최신. 특집이 하나도 없을 때만 최신으로 폴백(빈 헤드라인 방지).
+  const headline = featured[0] ?? top[0] ?? null;
+  const rest = top.filter((a) => a.id !== headline?.id); // 히어로 기사는 아래 목록에서 중복 제거
+  const sub = rest.slice(0, 4); // 주요뉴스
+  const latest = rest.slice(4, 16); // 최신
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
