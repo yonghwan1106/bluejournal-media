@@ -373,6 +373,23 @@ export async function statsTopArticles(days: number, limit = 10) {
   return rows.map((r) => ({ ...r, views: Number(r.views) }));
 }
 
+/** 최근 days일 내 발행된 기사 중 조회수 상위(주간 다이제스트 메일용). */
+export async function topRecentPublished(days: number, limit = 5) {
+  const rows = await getDb()
+    .select({ id: articles.id, title: articles.title, views: articles.viewCount })
+    .from(articles)
+    .where(
+      and(
+        eq(articles.status, "published"),
+        isNull(articles.deletedAt),
+        sql`${articles.publishedAt} >= now() - make_interval(days => ${days})`,
+      ),
+    )
+    .orderBy(desc(articles.viewCount), desc(articles.publishedAt))
+    .limit(limit);
+  return rows.map((r) => ({ ...r, views: Number(r.views ?? 0) }));
+}
+
 /** 섹션별 기간 조회 합계. */
 export async function statsTopSections(days: number) {
   const rows = await getDb()
