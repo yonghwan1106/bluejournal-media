@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   ]);
   const broken = scans.filter((s) => s.kind === "broken_image").length;
   const topHtml = top
-    .map((t, i) => `<li>${i + 1}. <a href="${SITE.url}/news/${t.id}">${t.title}</a> (${t.views})</li>`)
+    .map((t) => `<li><a href="${SITE.url}/news/${t.id}">${t.title}</a> (${t.views})</li>`)
     .join("");
 
   const html = `<div style="font-family:sans-serif;max-width:600px">

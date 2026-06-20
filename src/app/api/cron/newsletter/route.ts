@@ -17,8 +17,8 @@ export async function GET(req: Request) {
   }
   if (!emailConfigured()) return Response.json({ skip: "RESEND_API_KEY 미설정" });
 
-  const subs = await listConfirmedSubscribers();
-  if (!subs.length) return Response.json({ sent: 0 });
+  // 미리보기: ?preview=<email> 이면 실제 구독자 발송 없이 해당 주소로 1통만 보냄
+  const previewTo = new URL(req.url).searchParams.get("preview");
 
   const articles = await getLatest(8);
   const items = articles
@@ -30,17 +30,30 @@ export async function GET(req: Request) {
     )
     .join("");
 
-  let sent = 0;
-  for (const s of subs) {
-    const unsub = `${SITE.url}/api/newsletter/unsubscribe?token=${s.unsubscribeToken}`;
-    const html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+  const buildHtml = (unsub: string) => `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
       <h2 style="color:#0b4ea2;border-bottom:2px solid #0b4ea2;padding-bottom:8px">경인블루저널 주간 뉴스</h2>
       <ul style="padding-left:18px;margin-top:16px">${items}</ul>
       <p style="color:#888;font-size:12px;margin-top:28px;border-top:1px solid #eee;padding-top:12px">
         경인블루저널 · <a href="${SITE.url}" style="color:#888">bluejournal.co.kr</a> · <a href="${unsub}" style="color:#888">수신거부</a>
       </p>
     </div>`;
-    if (await sendEmail(s.email, "[경인블루저널] 이번 주 주요 뉴스", html)) sent++;
+
+  if (previewTo) {
+    const ok = await sendEmail(
+      previewTo,
+      "[미리보기] [경인블루저널] 이번 주 주요 뉴스",
+      buildHtml(`${SITE.url}`),
+    );
+    return Response.json({ preview: previewTo, articles: articles.length, sent: ok ? 1 : 0 });
+  }
+
+  const subs = await listConfirmedSubscribers();
+  if (!subs.length) return Response.json({ sent: 0 });
+
+  let sent = 0;
+  for (const s of subs) {
+    const unsub = `${SITE.url}/api/newsletter/unsubscribe?token=${s.unsubscribeToken}`;
+    if (await sendEmail(s.email, "[경인블루저널] 이번 주 주요 뉴스", buildHtml(unsub))) sent++;
   }
   return Response.json({ sent, total: subs.length });
 }
