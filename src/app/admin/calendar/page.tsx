@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/auth";
 import { dbConfigured, listScheduled, calendarMonth } from "@/lib/admin-db";
 import { NoDbNotice } from "@/components/admin/NoDbNotice";
@@ -18,7 +19,9 @@ export default async function CalendarPage({
   if (!dbConfigured()) return <NoDbNotice />;
   const sp = await searchParams;
 
-  const nowKst = new Date(Date.now() + 9 * 3600 * 1000);
+  const requestDate = (await headers()).get("date");
+  const now = requestDate ? new Date(requestDate) : new Date();
+  const nowKst = new Date(now.getTime() + 9 * 3600 * 1000);
   let year = nowKst.getUTCFullYear();
   let month = nowKst.getUTCMonth() + 1;
   if (sp.ym && /^\d{4}-\d{2}$/.test(sp.ym)) {

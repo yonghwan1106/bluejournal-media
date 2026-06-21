@@ -11,6 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "",
     "/section/뉴스",
     "/section/특집",
+    "/section/세계 자치모델",
     "/section/탐사문학",
     "/region/경기",
     "/region/인천",

@@ -25,6 +25,7 @@ export const SITE = {
 export const NAV = [
   { label: "뉴스", href: "/section/뉴스" },
   { label: "특집", href: "/section/특집" },
+  { label: "세계 자치모델", href: "/section/세계 자치모델" },
   { label: "탐사문학", href: "/section/탐사문학" },
   { label: "경기", href: "/region/경기" },
   { label: "인천", href: "/region/인천" },

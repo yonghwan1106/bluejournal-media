@@ -98,6 +98,7 @@ export function ArticleForm({
           <select name="section" defaultValue={article?.section ?? "뉴스"} className={field}>
             <option>뉴스</option>
             <option>특집</option>
+            <option>세계 자치모델</option>
             <option>탐사문학</option>
           </select>
         </div>

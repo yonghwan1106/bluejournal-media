@@ -362,4 +362,4 @@ export const countArticles = cache(
 );
 
 export const REGIONS = ["경기", "인천"] as const;
-export const SECTIONS = ["뉴스", "특집", "탐사문학"] as const;
+export const SECTIONS = ["뉴스", "특집", "세계 자치모델", "탐사문학"] as const;
