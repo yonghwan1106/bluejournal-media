@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getLatest, getByRegion, getBySection } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
+import { HeroCarousel } from "@/components/HeroCarousel";
 
 // ISR: 정적 캐시 후 최대 60초마다 백그라운드 재생성 (관리자 발행/수정은 revalidatePath 로 즉시 반영)
 export const revalidate = 60;
@@ -20,14 +21,15 @@ function SectionTitle({ title, href }: { title: string; href?: string }) {
 
 export default async function Home() {
   const [featured, top, gyeonggi, incheon] = await Promise.all([
-    getBySection("특집", 1), // 히어로는 특집 최신 1건만
-    getLatest(18),
+    getBySection("특집", 5), // 히어로 슬라이드: 특집 최신 5건
+    getLatest(22),
     getByRegion("경기", 8),
     getByRegion("인천", 8),
   ]);
-  // 히어로(헤드라인): 특집 최신. 특집이 하나도 없을 때만 최신으로 폴백(빈 헤드라인 방지).
-  const headline = featured[0] ?? top[0] ?? null;
-  const rest = top.filter((a) => a.id !== headline?.id); // 히어로 기사는 아래 목록에서 중복 제거
+  // 히어로(헤드라인) 슬라이드: 특집 최신순. 특집이 하나도 없으면 최신 1건으로 폴백(빈 헤드라인 방지).
+  const heroItems = featured.length ? featured : top.slice(0, 1);
+  const heroIds = new Set(heroItems.map((a) => a.id));
+  const rest = top.filter((a) => !heroIds.has(a.id)); // 히어로 기사들은 아래 목록에서 중복 제거
   const sub = rest.slice(0, 4); // 주요뉴스
   const latest = rest.slice(4, 16); // 최신
 
@@ -36,7 +38,7 @@ export default async function Home() {
       {/* 헤드라인 + 주요뉴스 */}
       <section className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          {headline && <ArticleCard a={headline} variant="hero" />}
+          {heroItems.length > 0 && <HeroCarousel articles={heroItems} />}
         </div>
         <div>
           <SectionTitle title="주요뉴스" />
