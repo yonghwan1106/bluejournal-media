@@ -37,7 +37,9 @@ export default async function Home() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       {/* 헤드라인 + 주요뉴스 */}
       <section className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        {/* min-w-0: 그리드 아이템 기본 min-width:auto 때문에 캐러셀 flex 트랙이 컬럼 폭으로 줄지 못해
+            모바일 가로 오버플로가 생기는 것을 방지 */}
+        <div className="min-w-0 lg:col-span-2">
           {heroItems.length > 0 && <HeroCarousel articles={heroItems} />}
         </div>
         <div>

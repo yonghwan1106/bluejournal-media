@@ -24,7 +24,12 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   line-height: 1.6;
+  /* keep-all 은 한글 가독성엔 좋지만 긴 URL·영문 토큰을 안 끊어 모바일 가로 오버플로를 유발.
+     anywhere 는 줄바꿈뿐 아니라 min-content 폭까지 줄여, min-width:auto 인 그리드/플렉스 트랙이
+     긴 토큰 때문에 팽창하는 것을 막는다(break-word 는 min-content 를 못 줄여 그리드 오버플로 잔존).
+     상속되어 카드 제목·검색어·본문 전역 적용. */
   word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 a {
@@ -47,6 +52,30 @@ a {
   margin: 1.2em auto;
   display: block;
   border-radius: 4px;
+}
+/* 임베드(유튜브 등): 고정 width/height 속성이 모바일 폭을 넘겨 가로 오버플로를 유발 →
+   16:9 반응형으로 강제(대부분 영상 임베드). */
+.article-body iframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin: 1.2em auto;
+  border: 0;
+}
+.article-body video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.2em auto;
+}
+/* 넓은 표/코드블록은 페이지를 밀지 않고 자체 가로 스크롤 */
+.article-body table,
+.article-body pre {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 .article-body h2,
 .article-body h3 {
