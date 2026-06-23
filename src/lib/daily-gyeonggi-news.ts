@@ -148,6 +148,29 @@ function absoluteUrl(url: string | undefined, base: string): string {
   return new URL(url, base).href.replace(/;jsessionid=[^?]+/i, "");
 }
 
+function isUsableImageUrl(url: string | null | undefined): url is string {
+  const raw = String(url ?? "").trim();
+  if (!raw || raw === "#" || raw.startsWith("javascript:") || raw.startsWith("data:")) return false;
+  if (raw.endsWith("#")) return false;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const text = parsed.href.toLowerCase();
+    return (
+      /\.(jpe?g|png|webp|gif)(?:[?#]|$)/i.test(text) ||
+      /\/comm\/getimage/i.test(text) ||
+      /\/site\/lwmkr\/file\/image\//i.test(text) ||
+      /\/namoeditor\//i.test(text) ||
+      /\/webcontent\/upload\//i.test(text) ||
+      /\/attach\/bbs\//i.test(text) ||
+      /\/upload\/board\//i.test(text) ||
+      /(?:filedownload|filedownload\.do|filedownload\.php)/i.test(text)
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function fetchText(url: string): Promise<string> {
   try {
     const res = await fetch(url, {
@@ -851,7 +874,7 @@ export async function extractArticle(
     throw new Error(`당일 자료 아님: expected=${date}, actual=${sourceDate || "unknown"}`);
   }
 
-  const sourceImage = imageUrl || item.fallbackImageUrl || null;
+  const sourceImage = [imageUrl, item.fallbackImageUrl].find(isUsableImageUrl) ?? null;
   if (!sourceImage) {
     throw new SkipArticleError("skip_no_image", "이미지 없는 자료 제외");
   }
@@ -859,6 +882,9 @@ export async function extractArticle(
   const effectiveImage = options.mirrorAssets
     ? await mirrorImage(sourceImage, `${date}/${item.key}`)
     : sourceImage;
+  if (!effectiveImage) {
+    throw new SkipArticleError("skip_no_image", "이미지 없는 자료 제외");
+  }
   const paragraphs = splitParagraphs(body)
     .filter((paragraph) => !title.includes(paragraph) && !paragraph.includes(title))
     .slice(0, 7);
@@ -953,11 +979,11 @@ async function mirrorImage(imageUrl: string | null, keyBase: string): Promise<st
   if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET) {
     return imageUrl;
   }
+  const got = await fetchImageBuffer(imageUrl);
+  if (!got) return null;
+  const { buf, contentType } = got;
+  if (buf.length < 1000 || !contentType.startsWith("image/")) return null;
   try {
-    const got = await fetchImageBuffer(imageUrl);
-    if (!got) return imageUrl;
-    const { buf, contentType } = got;
-    if (buf.length < 1000 || !contentType.startsWith("image/")) return imageUrl;
     const key = `data/external/gyeonggi-news/${slug(keyBase)}.${mediaExt(contentType, imageUrl)}`;
     const s3 = new S3Client({
       region: "auto",
@@ -978,7 +1004,7 @@ async function mirrorImage(imageUrl: string | null, keyBase: string): Promise<st
     const base = (R2_PUBLIC_BASE || NEXT_PUBLIC_MEDIA_BASE || "").replace(/\/$/, "");
     return base ? `${base}/${key}` : imageUrl;
   } catch {
-    return imageUrl;
+    return null;
   }
 }
 
