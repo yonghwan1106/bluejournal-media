@@ -337,10 +337,17 @@ export async function statsSummary(days: number) {
 
 /** 일/주/월 버킷별 PV·UV 추이. */
 export async function statsTrend(unit: StatUnit, days: number) {
+  // date_trunc 의 단위는 바인딩 파라미터가 아니라 리터럴로 주입한다.
+  // 파라미터(${unit})로 넣으면 동일한 bucket 조각이 SELECT·GROUP BY·ORDER BY 에
+  // 재사용될 때 각각 다른 placeholder($1·$3·$4)로 렌더돼, PG 가 SELECT 의
+  // date_trunc 표현식을 GROUP BY 와 다른 것으로 보고 42803
+  // ("column page_views.day must appear in the GROUP BY clause")을 던진다.
+  // unit 은 고정 화이트리스트(week|month)라 리터럴 주입은 안전하다.
+  const truncUnit = unit === "month" ? "month" : "week";
   const bucket =
     unit === "day"
       ? sql`${pageViews.day}`
-      : sql`date_trunc(${unit}, ${pageViews.day})::date`;
+      : sql`date_trunc(${sql.raw(`'${truncUnit}'`)}, ${pageViews.day})::date`;
   const rows = await getDb()
     .select({
       bucket: sql<string>`${bucket}`,
