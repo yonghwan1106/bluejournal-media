@@ -24,6 +24,16 @@ const nextConfig: NextConfig = {
         destination: "/news/:id",
         statusCode: 301,
       },
+      // 그 외 잔여 레거시 그누보드 경로(로그인·타 게시판·검색 등)는 Vercel 방화벽이
+      // 403(deny)로 막아, Google이 "색인 실패: 액세스 금지(403)"로 무한 재시도하며
+      // Search Console 경고를 반복 발송한다. 위 두 규칙에 안 잡히는 /bbs/* 는 홈으로
+      // 301 통합 → 403이 명확한 이전(moved) 신호로 바뀌어 구 URL 색인 정리가 가속된다.
+      // 실제 기사(bo_table=news&wr_id=\d+)는 위 규칙이 먼저 매칭되어 /news/:id 로 감.
+      {
+        source: "/bbs/:path*",
+        destination: "/",
+        statusCode: 301,
+      },
     ];
   },
   // 전역 보안 응답 헤더. 엄격 CSP 는 Next 하이드레이션 nonce 배선 + 라이브 검증이
