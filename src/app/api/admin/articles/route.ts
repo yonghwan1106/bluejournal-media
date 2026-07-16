@@ -70,6 +70,7 @@ export async function POST(req: Request) {
 
   // 공개면 즉시 반영(서버 액션 경로와 동일하게 ISR 무효화)
   revalidatePath("/");
+  revalidatePath("/rss.xml");
   revalidatePath("/section/[section]", "page");
   revalidatePath("/region/[region]", "page");
   revalidatePath(`/news/${id}`);

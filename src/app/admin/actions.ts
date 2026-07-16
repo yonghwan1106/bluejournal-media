@@ -42,6 +42,7 @@ function normStatus(v: unknown, fallback: ArticleStatus): ArticleStatus {
 function revalidatePublic(id?: number) {
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/rss.xml");
   revalidatePath("/section/[section]", "page");
   revalidatePath("/region/[region]", "page");
   if (id) revalidatePath(`/news/${id}`);

@@ -5,7 +5,8 @@ import { getLatest } from "@/lib/articles";
 import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
-export const revalidate = 600; // 10분 캐시(ISR)
+// Neon 무료플랜 컴퓨트 절약: 시간 기반 재생성은 1시간, 신규 발행은 revalidatePath("/rss.xml")로 즉시 반영
+export const revalidate = 3600;
 
 function esc(s: string): string {
   return s
@@ -52,7 +53,7 @@ ${body}
   return new Response(xml, {
     headers: {
       "Content-Type": "application/rss+xml; charset=utf-8",
-      "Cache-Control": "public, max-age=0, s-maxage=600, stale-while-revalidate=86400",
+      "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
     },
   });
 }

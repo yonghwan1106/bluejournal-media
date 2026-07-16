@@ -31,6 +31,7 @@ export async function GET(req: Request) {
     ids = rows.map((r) => r.id);
     if (ids.length) {
       revalidatePath("/");
+      revalidatePath("/rss.xml");
       revalidatePath("/section/[section]", "page");
       revalidatePath("/region/[region]", "page");
       for (const id of ids) revalidatePath(`/news/${id}`);
