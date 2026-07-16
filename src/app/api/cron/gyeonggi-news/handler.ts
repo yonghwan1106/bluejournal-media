@@ -33,6 +33,7 @@ export async function handleGyeonggiNewsCron(req: Request, config: GyeonggiNewsC
 
     if (!dryRun && result.published > 0) {
       revalidatePath("/");
+      revalidatePath("/rss.xml");
       revalidatePath("/section/[section]", "page");
       revalidatePath("/region/[region]", "page");
       for (const item of result.results) {
