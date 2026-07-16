@@ -7,8 +7,10 @@ import { sanitizeBodyHtml } from "@/lib/sanitize";
 import { formatDateTime } from "@/lib/format";
 import { ArticleCard } from "@/components/ArticleCard";
 
-// ISR: 기존 기사는 빌드시 프리렌더, 신규(미지정 id)는 on-demand 후 캐시. 최대 60초마다 갱신.
-export const revalidate = 60;
+// ISR: 기존 기사는 빌드시 프리렌더, 신규(미지정 id)는 on-demand 후 캐시.
+// 검색 봇의 반복 방문이 매분 DB 재검증을 일으키지 않도록 1시간 ISR을 사용한다.
+// 발행/수정 시 관리자 작업과 게시 API가 이 경로를 on-demand revalidate 한다.
+export const revalidate = 3600;
 
 export async function generateStaticParams() {
   const ids = await getAllIds();

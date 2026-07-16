@@ -3,8 +3,9 @@ import { getLatest, getByRegion, getBySection } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
 import { HeroCarousel } from "@/components/HeroCarousel";
 
-// ISR: 정적 캐시 후 최대 60초마다 백그라운드 재생성 (관리자 발행/수정은 revalidatePath 로 즉시 반영)
-export const revalidate = 60;
+// ISR: 정적 캐시 후 최대 1시간마다 백그라운드 재생성.
+// 관리자 발행/수정은 revalidatePath 로 즉시 반영하므로 긴 TTL이어도 새 기사는 바로 노출된다.
+export const revalidate = 3600;
 
 function SectionTitle({ title, href }: { title: string; href?: string }) {
   return (

@@ -2,7 +2,8 @@ import { getBySection, SECTIONS } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
 import type { Metadata } from "next";
 
-export const revalidate = 60;
+// 발행/수정 시 on-demand revalidation이 있으므로 시간 기반 ISR은 1시간이면 충분하다.
+export const revalidate = 3600;
 
 export function generateStaticParams() {
   return SECTIONS.map((s) => ({ section: s }));
