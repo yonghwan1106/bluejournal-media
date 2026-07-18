@@ -6,7 +6,6 @@ import { SITE } from "@/lib/site";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = SITE.url;
   const statics: MetadataRoute.Sitemap = [
     "",
     "/section/뉴스",
@@ -21,14 +20,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/privacy",
     "/contact",
   ].map((p) => ({
-    url: `${base}${p}`,
+    url: new URL(p || "/", SITE.url).toString(),
     changeFrequency: p === "" ? "hourly" : "daily",
     priority: p === "" ? 1 : 0.5,
   }));
 
   const articles: MetadataRoute.Sitemap = (await getSitemapArticles()).map(
     (a) => ({
-      url: `${base}/news/${a.id}`,
+      url: new URL(`/news/${a.id}`, SITE.url).toString(),
       lastModified: a.publishedAt ?? undefined,
       changeFrequency: "monthly",
       priority: 0.7,

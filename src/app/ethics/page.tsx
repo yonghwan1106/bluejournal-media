@@ -1,4 +1,6 @@
-export const metadata = { title: "윤리강령" };
+import { sitePageMetadata } from "@/lib/site";
+
+export const metadata = sitePageMetadata("/ethics", "윤리강령");
 
 export default function EthicsPage() {
   return (

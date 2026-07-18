@@ -1,7 +1,18 @@
 import { searchArticles } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
+import type { Metadata } from "next";
+import { SITE } from "@/lib/site";
 
-export const metadata = { title: "기사 검색" };
+export const metadata: Metadata = {
+  title: "기사 검색",
+  robots: { index: false, follow: true },
+  openGraph: {
+    siteName: SITE.name,
+    type: "website",
+    locale: "ko_KR",
+    url: new URL("/search", SITE.url).toString(),
+  },
+};
 
 export default async function SearchPage({
   searchParams,

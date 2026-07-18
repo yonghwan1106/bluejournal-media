@@ -1,6 +1,6 @@
-import { SITE } from "@/lib/site";
+import { SITE, sitePageMetadata } from "@/lib/site";
 
-export const metadata = { title: "회사소개" };
+export const metadata = sitePageMetadata("/about", "회사소개");
 
 export default function AboutPage() {
   return (

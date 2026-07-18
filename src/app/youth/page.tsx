@@ -1,6 +1,6 @@
-import { SITE } from "@/lib/site";
+import { SITE, sitePageMetadata } from "@/lib/site";
 
-export const metadata = { title: "청소년보호정책" };
+export const metadata = sitePageMetadata("/youth", "청소년보호정책");
 
 export default function YouthPage() {
   return (

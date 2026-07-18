@@ -1,6 +1,6 @@
-import { SITE } from "@/lib/site";
+import { SITE, sitePageMetadata } from "@/lib/site";
 
-export const metadata = { title: "기사제보·광고문의" };
+export const metadata = sitePageMetadata("/contact", "기사제보·광고문의");
 
 export default function ContactPage() {
   return (

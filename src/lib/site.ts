@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 /** 매체 정보 (신문법 의무게재 + 메타데이터 단일 소스) */
 export const SITE = {
   name: "경인블루저널",
@@ -20,6 +22,25 @@ export const SITE = {
   fax: "031-287-2215",
   email: "bluejournal@daum.net",
 } as const;
+
+/** canonical과 Open Graph URL을 같은 절대 URL로 유지하는 공개 페이지 메타데이터. */
+export function sitePageMetadata(path: string, title?: string): Metadata {
+  const url = new URL(path, SITE.url).toString();
+
+  return {
+    ...(title ? { title } : {}),
+    alternates: {
+      canonical: url,
+      types: { "application/rss+xml": new URL("/rss.xml", SITE.url).toString() },
+    },
+    openGraph: {
+      siteName: SITE.name,
+      type: "website",
+      locale: "ko_KR",
+      url,
+    },
+  };
+}
 
 /** 상단 내비게이션 */
 export const NAV = [

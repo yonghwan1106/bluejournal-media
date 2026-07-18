@@ -1,12 +1,26 @@
 import { getByRegion, REGIONS } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
 import type { Metadata } from "next";
+import { sitePageMetadata } from "@/lib/site";
+import { notFound } from "next/navigation";
 
 // 발행/수정 시 on-demand revalidation이 있으므로 시간 기반 ISR은 1시간이면 충분하다.
 export const revalidate = 3600;
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return REGIONS.map((r) => ({ region: r }));
+}
+
+function validRegion(rawRegion: string): (typeof REGIONS)[number] {
+  let region: string;
+  try {
+    region = decodeURIComponent(rawRegion);
+  } catch {
+    notFound();
+  }
+  if (!(REGIONS as readonly string[]).includes(region)) notFound();
+  return region as (typeof REGIONS)[number];
 }
 
 export async function generateMetadata({
@@ -15,7 +29,11 @@ export async function generateMetadata({
   params: Promise<{ region: string }>;
 }): Promise<Metadata> {
   const { region } = await params;
-  return { title: `${decodeURIComponent(region)} 지역뉴스` };
+  const name = validRegion(region);
+  return sitePageMetadata(
+    `/region/${encodeURIComponent(name)}`,
+    `${name} 지역뉴스`,
+  );
 }
 
 export default async function RegionPage({
@@ -24,7 +42,7 @@ export default async function RegionPage({
   params: Promise<{ region: string }>;
 }) {
   const { region } = await params;
-  const r = decodeURIComponent(region);
+  const r = validRegion(region);
   const list = await getByRegion(r);
 
   return (
