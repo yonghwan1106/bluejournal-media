@@ -7,10 +7,10 @@ import { formatDate } from "@/lib/format";
 import type { SeedArticle } from "@/lib/articles";
 
 const AUTOPLAY_MS = 5000; // 자동 전환 간격
-const MAX_SLIDES = 5; // 히어로에 노출할 특집 최대 건수
+const MAX_SLIDES = 5; // 히어로에 노출할 헤드라인 최대 건수
 
 /**
- * 히어로(헤드라인) 슬라이드. 특집 기사 최신순 최대 5건을 자동으로 순환한다.
+ * 히어로 슬라이드. 선정된 헤드라인 기사 최대 5건을 최신순으로 자동 순환한다.
  * - 5초 자동재생(무한 루프) + 좌우 화살표 + 점 인디케이터 + 재생/일시정지 토글
  * - 마우스 호버·포커스 시 일시정지(서로 독립), prefers-reduced-motion 실시간 존중
  * - 자동재생 중엔 aria-live=off, 정지/수동 조작 시 polite 로 전환해 변경 안내
@@ -78,7 +78,7 @@ export function HeroCarousel({ articles }: { articles: SeedArticle[] }) {
   return (
     <section
       aria-roledescription="carousel"
-      aria-label="특집 기사"
+      aria-label="헤드라인 기사"
       className="relative"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
@@ -111,10 +111,10 @@ export function HeroCarousel({ articles }: { articles: SeedArticle[] }) {
         <>
           {/* 좌우 화살표: 이미지 박스(16/9)에 정확히 겹치도록 동일 비율 오버레이로 정렬 */}
           <div className="pointer-events-none absolute inset-x-0 top-0 flex aspect-[16/9] items-center justify-between px-2 sm:px-3">
-            <CarouselButton label="이전 특집 기사" onClick={prev}>
+            <CarouselButton label="이전 헤드라인 기사" onClick={prev}>
               <ChevronLeft />
             </CarouselButton>
-            <CarouselButton label="다음 특집 기사" onClick={next}>
+            <CarouselButton label="다음 헤드라인 기사" onClick={next}>
               <ChevronRight />
             </CarouselButton>
           </div>
@@ -138,7 +138,7 @@ export function HeroCarousel({ articles }: { articles: SeedArticle[] }) {
                     key={a.id}
                     type="button"
                     onClick={() => go(i)}
-                    aria-label={`${i + 1}번째 특집 기사로 이동`}
+                    aria-label={`${i + 1}번째 헤드라인 기사로 이동`}
                     aria-current={isActive ? "true" : undefined}
                     className={`h-2 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
                       isActive ? "w-6 bg-brand" : "w-2 bg-muted/50 hover:bg-muted"
@@ -186,7 +186,7 @@ function HeroSlide({
               className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
             />
           ) : (
-            // 썸네일 없는 특집: 빈 회색 대신 브랜드 그라데이션 + 라벨로 의도된 화면 구성
+            // 썸네일 없는 헤드라인: 빈 회색 대신 브랜드 그라데이션 + 라벨로 의도된 화면 구성
             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-brand to-brand-dark">
               <span className="text-xl font-extrabold tracking-wide text-white/90">
                 {label}

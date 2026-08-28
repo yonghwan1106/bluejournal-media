@@ -222,6 +222,36 @@ export const getHeadline = cache(
   async (): Promise<SeedArticle | null> => (await getLatest(1))[0] ?? null,
 );
 
+/** 헤드라인 지정 또는 특집 기사 최대 5건. 전체 최신순이며, 빈 경우 폴백은 호출부에서 처리. */
+export const getHeroArticles = cache(
+  async (): Promise<SeedArticle[]> =>
+    viaDb(
+      async () =>
+        (
+          await getDb()
+            .select(CARD_COLS)
+            .from(articles)
+            .where(
+              and(
+                and(eq(articles.status, "published"), isNull(articles.deletedAt)),
+                or(
+                  eq(articles.displaySlot, "헤드라인"),
+                  eq(articles.section, "특집"),
+                ),
+              ),
+            )
+            .orderBy(pubOrder)
+            .limit(5)
+        ).map(fromCard),
+      () =>
+        jsonPub()
+          .filter(
+            (a) => a.displaySlot === "헤드라인" || a.section === "특집",
+          )
+          .slice(0, 5),
+    ),
+);
+
 export const getBySection = cache(
   async (section: string, n = LIST_PAGE_SIZE): Promise<SeedArticle[]> =>
     viaDb(

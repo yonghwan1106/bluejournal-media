@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getLatest, getByRegion, getBySection } from "@/lib/articles";
+import { getLatest, getByRegion, getHeroArticles } from "@/lib/articles";
 import { ArticleCard } from "@/components/ArticleCard";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { sitePageMetadata } from "@/lib/site";
@@ -24,14 +24,14 @@ function SectionTitle({ title, href }: { title: string; href?: string }) {
 }
 
 export default async function Home() {
-  const [featured, top, gyeonggi, incheon] = await Promise.all([
-    getBySection("특집", 5), // 히어로 슬라이드: 특집 최신 5건
+  const [heroCandidates, top, gyeonggi, incheon] = await Promise.all([
+    getHeroArticles(), // 히어로 슬라이드: 헤드라인 지정 또는 특집 최신 5건
     getLatest(22),
     getByRegion("경기", 8),
     getByRegion("인천", 8),
   ]);
-  // 히어로(헤드라인) 슬라이드: 특집 최신순. 특집이 하나도 없으면 최신 1건으로 폴백(빈 헤드라인 방지).
-  const heroItems = featured.length ? featured : top.slice(0, 1);
+  // 히어로 슬라이드: 헤드라인 지정/특집 전체 최신순. 대상이 없으면 최신 1건으로 폴백.
+  const heroItems = heroCandidates.length ? heroCandidates : top.slice(0, 1);
   const heroIds = new Set(heroItems.map((a) => a.id));
   const rest = top.filter((a) => !heroIds.has(a.id)); // 히어로 기사들은 아래 목록에서 중복 제거
   const sub = rest.slice(0, 4); // 주요뉴스
