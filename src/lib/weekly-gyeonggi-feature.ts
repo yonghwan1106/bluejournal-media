@@ -102,9 +102,9 @@ const IMAGE_TIMEOUT_MS = 60_000;
 const R2_UPLOAD_TIMEOUT_MS = 30_000;
 const PUBLIC_IMAGE_TIMEOUT_MS = 12_000;
 const MIN_PUBLIC_IMAGE_BYTES = 800;
-const RSI_GOOGLE_THINKING_BUDGET = 2_048;
+const RSI_GOOGLE_THINKING_BUDGET = 0;
 const RSI_MAX_OUTPUT_TOKENS = 5_000;
-const RSI_STRUCTURED_OUTPUT_ATTEMPTS = 2;
+const RSI_STRUCTURED_OUTPUT_ATTEMPTS = 3;
 
 const DEFAULT_IMAGE_MODEL = "openai/gpt-image-2";
 
@@ -504,7 +504,7 @@ const rsiSchema = jsonSchema<RsiReview>({
         properties: {
           severity: { type: "string", enum: ["critical", "major", "minor"] },
           issue: { type: "string", minLength: 3, maxLength: 500 },
-          sourceId: { type: ["string", "null"] },
+          sourceId: { type: "string" },
           fix: { type: "string", minLength: 3, maxLength: 500 },
         },
       },
@@ -762,6 +762,7 @@ async function reviewDraft(
     `- RSI_PASS 구조 조건: sections가 정확히 ${WEEKLY_FEATURE_SECTION_ROLES.join(" → ")} 순서의 5개 역할을 모두 충족하고, 각 heading과 paragraphs의 실제 의미도 해당 역할에 부합함. '현황'은 현재 상태, '원인'은 공식자료로 확인되는 배경·원인, '데이터·사례'는 검증 가능한 수치·사례, '반론'은 한계·반대 근거·불확실성, '대안·전망'은 근거 있는 대안과 확인할 전망을 다뤄야 하며 role 라벨만 맞춘 형식적 구성은 PASS하지 않음.`,
     `- RSI_PASS 분량 조건: 제목·소제목을 뺀 기사 원문이 공백 포함 ${MIN_WEEKLY_FEATURE_BODY_CHARS}~${MAX_WEEKLY_FEATURE_BODY_CHARS}자이며, 목표 범위는 2,500~3,500자임. 현재 원문은 ${weeklyFeatureDraftText(draft).length}자임.`,
     "- 출처 판정 방식: 기사 JSON의 section.sourceIds는 공식자료 JSON의 id에 매핑되고 최종 렌더러가 해당 id의 공식 URL 링크를 본문에 삽입한다. 유효 sourceId가 공식 URL에 정확히 매핑되면 URL 인용으로 평가하며, 기사 JSON에 URL 문자열이 직접 없다는 이유만으로 REVISE나 HOLD를 판정하지 않는다.",
+    '- 각 issue의 sourceId는 반드시 문자열로 반환하고, 특정 공식자료 ID와 연결되지 않는 지적이면 null 대신 빈 문자열("")을 쓴다.',
     "- REVISE: 제공된 공식자료 안의 정답으로 고칠 수 있는 잘못된 수치·날짜·사업 단계, 맥락 누락, 과장·단정, 부정확한 제목·부제·리드·결론, sourceId 오용, 구조 문제는 반드시 REVISE로 판정한다.",
     `- HOLD: 원 공식자료 자체가 서로 다른 공식 URL ${MIN_WEEKLY_FEATURE_SOURCES}개 미만이거나, 자료들이 동일 사건·사업·정책을 직접 다루지 않거나, 공식자료끼리 핵심 사실이 상충하거나, 기사 전체를 다시 써도 안전한 발행이 불가능한 경우에만 판정한다. 공식자료에 정답이 있는 누락·부정확·단정 표현은 HOLD 사유가 아니다.`,
     `로컬 구조 검사: ${localErrors.length ? localErrors.join(" | ") : "통과"}`,
