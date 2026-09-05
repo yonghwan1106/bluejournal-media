@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { authorizeCronRequest } from "../src/lib/cron-auth";
 import {
+  MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES,
   WEEKLY_FEATURE_SECTION_ROLES,
   buildWeeklyFeatureBodyHtml,
   buildWeeklyFeatureFallbackSvg,
   buildWeeklyFeatureSchedule,
+  canonicalizeWeeklyFeatureSections,
   isBeforeWeeklyFeaturePublishDeadline,
   validateDraftForSources,
   validateTopicSelection,
@@ -137,6 +139,38 @@ test("주제와 기사 검사는 서로 다른 공식 근거 세 건을 강제�
     section.paragraphs = ["공식자료로 확인된 내용을 설명하는 짧은 검증 문단입니다.".repeat(2), "후속 확인이 필요합니다.".repeat(4)];
   });
   assert.match(validateDraftForSources(tooShort, evidence).join(" "), /2500자 미만/);
+});
+
+test("생성 섹션을 편집 규격 순서로 고정하고 RSI 수정은 최대 두 회 허용한다", () => {
+  const shuffled = [
+    draft.sections[3],
+    draft.sections[0],
+    draft.sections[4],
+    draft.sections[2],
+    draft.sections[1],
+  ];
+  const canonical = canonicalizeWeeklyFeatureSections(shuffled);
+
+  assert.deepEqual(
+    canonical.map((section) => section.role),
+    WEEKLY_FEATURE_SECTION_ROLES,
+  );
+  assert.deepEqual(
+    shuffled.map((section) => section.role),
+    ["반론", "현황", "대안·전망", "데이터·사례", "원인"],
+    "입력 배열 자체는 변경하지 않아야 한다",
+  );
+  assert.deepEqual(validateDraftForSources({ ...draft, sections: canonical }, evidence), []);
+
+  const duplicateRole = structuredClone(draft);
+  duplicateRole.sections[4].role = "현황";
+  const canonicalDuplicate = canonicalizeWeeklyFeatureSections(duplicateRole.sections);
+  assert.match(
+    validateDraftForSources({ ...duplicateRole, sections: canonicalDuplicate }, evidence).join(" "),
+    /섹션 역할/,
+    "정렬이 중복 역할이나 누락 역할을 정상 구조로 위장하면 안 된다",
+  );
+  assert.equal(MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES, 2);
 });
 
 test("도청 s017과 시군 s003 목록은 서로 다른 실제 경로와 행 selector로 파싱한다", () => {
