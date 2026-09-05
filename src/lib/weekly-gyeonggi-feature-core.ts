@@ -264,6 +264,25 @@ export function isGenericWeeklyFeatureArchiveTerm(value: string): boolean {
   );
 }
 
+/** 모델 응답에서 일반어와 중복을 제거해 실제 과거 자료 검색에 쓸 핵심어만 남긴다. */
+export function sanitizeWeeklyFeatureArchiveTerms(values: readonly string[]): string[] {
+  const sanitized: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of values) {
+    const normalized = normalizeWeeklyFeatureIssueText(value);
+    if (!normalized || seen.has(normalized) || isGenericWeeklyFeatureArchiveTerm(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    sanitized.push(normalized);
+    if (sanitized.length === 4) break;
+  }
+
+  return sanitized;
+}
+
 /** 모든 핵심어가 제목에 직접 나타날 때만 같은 현안의 보강 자료로 인정한다. */
 export function matchesWeeklyFeatureIssueTitle(title: string, archiveTerms: string[]): boolean {
   const normalizedTitle = normalizeWeeklyFeatureIssueText(title);
