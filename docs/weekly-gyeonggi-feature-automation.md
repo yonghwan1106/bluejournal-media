@@ -51,14 +51,14 @@
 - `WEEKLY_FEATURE_TEXT_MODEL`: 선택, 기본 `openai/gpt-5.4-nano`
 - `WEEKLY_FEATURE_TEXT_FALLBACK_MODELS`: 선택, 쉼표로 구분. 기본 `openai/gpt-5-nano,google/gemini-2.5-flash-lite`
 - `WEEKLY_FEATURE_RSI_MODEL`: 선택, 기본 `google/gemini-2.5-flash`
-- `WEEKLY_FEATURE_RSI_FALLBACK_MODELS`: 선택, 쉼표로 구분. 기본 `openai/gpt-4.1-mini,openai/gpt-5.4-nano`
+- `WEEKLY_FEATURE_RSI_FALLBACK_MODELS`: 선택, 쉼표로 구분. 기본 `google/gemini-2.5-flash-lite,openai/gpt-4.1-mini,openai/gpt-5.4-nano`
 - `WEEKLY_FEATURE_IMAGE_MODEL`: 선택, 기본 `openai/gpt-image-2`
 
 모델 값은 반드시 `provider/model` 문자열이어야 한다. 폴백 목록은 빈 항목을 제외하고 중복과 주 모델을 제거하며, 그 결과 주 모델과 다른 유효 모델이 하나도 없으면 실행을 중단한다. 기본 모델은 실시간 Gateway 카탈로그에 존재하고 tool-use를 지원하며, 현재 구조화 출력 비호환이 알려지지 않은 후보로 구성한다. 다만 계정의 무료 한도나 공급자 상태에 따라 모든 후보가 rate limit에 걸릴 수 있다.
 
 텍스트 작성과 RSI는 서로 다른 호출·프롬프트이며 기본 주 모델도 각각 OpenAI와 Google로 분리한다. 그러나 어느 한쪽이 폴백을 사용하면 최종 성공 모델이 다른 단계와 같아질 수 있으므로, 항상 서로 다른 모델이 검수한다고 보장하지는 않는다. 폴백 여부와 관계없이 RSI 프롬프트·구조화 판정·최종 `RSI_PASS` 발행 조건은 동일해 검수 기준을 낮추지 않는다.
 
-AI Gateway의 `providerOptions.gateway.models`는 Gateway가 인식한 모델·공급자 실패 때 주 모델 다음의 폴백 모델을 순서대로 시도한다. HTTP 성공 뒤 잘못된 구조가 반환돼 클라이언트에서 `AI_NoObjectGeneratedError`가 발생한 경우에는 Gateway 모델 폴백이 실행되지 않으며, 자동화는 이를 발행 실패로 닫는다. 모든 모델이 실패해도 HTTP 500으로 끝나고 dry-run에서는 기사·실행 행을 생성하지 않는다. 로컬에서 Vercel OIDC를 사용할 때는 최신 프로젝트 환경을 다시 받아 토큰을 갱신한다. OIDC를 쓰지 않는 로컬 검증은 별도의 AI Gateway API 키 설정이 필요할 수 있다.
+AI Gateway의 `providerOptions.gateway.models`는 Gateway가 인식한 모델·공급자 실패 때 주 모델 다음의 폴백 모델을 순서대로 시도한다. HTTP 성공 뒤 잘못된 구조가 반환돼 클라이언트에서 `AI_NoObjectGeneratedError`가 발생하면 Gateway 자체 폴백은 이미 끝난 것으로 보므로, 자동화가 다음 독립 모델로 최대 세 번 새 RSI 호출을 한다. Google 구조화 출력 호환성을 위해 issue의 `sourceId`는 문자열로만 받고 연결 출처가 없으면 빈 문자열을 반환하게 한 뒤 내부에서 `null`로 정규화한다. Gemini RSI 호출은 구조화 응답 공간과 지연을 안정화하려고 thinking을 비활성화한다. 모든 모델이 실패해도 HTTP 500으로 끝나고 dry-run에서는 기사·실행 행을 생성하지 않는다. 로컬에서 Vercel OIDC를 사용할 때는 최신 프로젝트 환경을 다시 받아 토큰을 갱신한다. OIDC를 쓰지 않는 로컬 검증은 별도의 AI Gateway API 키 설정이 필요할 수 있다.
 
 ### Cloudflare R2
 

@@ -17,6 +17,7 @@ export const DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS = [
 ] as const;
 export const DEFAULT_WEEKLY_FEATURE_RSI_MODEL = "google/gemini-2.5-flash";
 export const DEFAULT_WEEKLY_FEATURE_RSI_FALLBACK_MODELS = [
+  "google/gemini-2.5-flash-lite",
   "openai/gpt-4.1-mini",
   "openai/gpt-5.4-nano",
 ] as const;

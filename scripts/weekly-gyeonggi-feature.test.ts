@@ -567,6 +567,13 @@ test("기사 생성과 RSI 판정 프롬프트가 절차 상태·출처 매핑·
   assert.match(weeklyFeatureAutomationSource, /사업 절차 상태를 원문 표현대로 정확히 구분/);
   assert.match(weeklyFeatureAutomationSource, /section\.sourceIds는 공식자료 JSON의 id에 매핑/);
   assert.match(weeklyFeatureAutomationSource, /기사 JSON에 URL 문자열이 직접 없다는 이유만으로/);
+  assert.match(weeklyFeatureAutomationSource, /sourceId는 반드시 문자열로 반환/);
+  assert.match(weeklyFeatureAutomationSource, /null 대신 빈 문자열/);
+  assert.match(weeklyFeatureAutomationSource, /sourceId:\s*\{ type:\s*"string" \}/);
+  assert.doesNotMatch(
+    weeklyFeatureAutomationSource,
+    /sourceId:\s*\{\s*type:\s*\[\s*"string"\s*,\s*"null"\s*\]/,
+  );
   assert.match(weeklyFeatureAutomationSource, /반드시 REVISE로 판정/);
   assert.match(weeklyFeatureAutomationSource, /기사 전체를 다시 써도 안전한 발행이 불가능/);
   assert.match(weeklyFeatureAutomationSource, /누락·부정확·단정 표현은 HOLD 사유가 아니다/);
@@ -579,6 +586,7 @@ test("AI Gateway 텍스트·RSI 라우팅은 공급자 다변화 폴백과 설�
   ]);
   assert.equal(DEFAULT_WEEKLY_FEATURE_RSI_MODEL, "google/gemini-2.5-flash");
   assert.deepEqual(DEFAULT_WEEKLY_FEATURE_RSI_FALLBACK_MODELS, [
+    "google/gemini-2.5-flash-lite",
     "openai/gpt-4.1-mini",
     "openai/gpt-5.4-nano",
   ]);
@@ -641,9 +649,10 @@ test("AI Gateway 텍스트·RSI 라우팅은 공급자 다변화 폴백과 설�
   );
   assert.match(weeklyFeatureAutomationSource, /gateway:\s*gatewayOptions/);
   assert.match(weeklyFeatureAutomationSource, /NoObjectGeneratedError\.isInstance\(error\)/);
+  assert.match(weeklyFeatureAutomationSource, /const RSI_GOOGLE_THINKING_BUDGET = 0/);
   assert.match(weeklyFeatureAutomationSource, /thinkingBudget:\s*RSI_GOOGLE_THINKING_BUDGET/);
   assert.match(weeklyFeatureAutomationSource, /maxOutputTokens:\s*RSI_MAX_OUTPUT_TOKENS/);
-  assert.match(weeklyFeatureAutomationSource, /RSI_STRUCTURED_OUTPUT_ATTEMPTS/);
+  assert.match(weeklyFeatureAutomationSource, /const RSI_STRUCTURED_OUTPUT_ATTEMPTS = 3/);
 });
 
 test("도청 s017과 시군 s003 목록은 서로 다른 실제 경로와 행 selector로 파싱한다", () => {
