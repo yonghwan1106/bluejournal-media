@@ -55,6 +55,9 @@ const weeklyFeatureAutomationSource = readFileSync(
   new URL("../src/lib/weekly-gyeonggi-feature.ts", import.meta.url),
   "utf8",
 );
+const vercelConfig = JSON.parse(
+  readFileSync(new URL("../vercel.json", import.meta.url), "utf8"),
+) as { crons: Array<{ path: string; schedule: string }> };
 
 const evidence: WeeklyFeatureEvidence[] = [1, 2, 3].map((number) => ({
   id: `s017-${number}`,
@@ -126,6 +129,22 @@ test("KST 토요일 prepare와 retry가 같은 주차키와 09:00 예약시각�
   assert.equal(
     isBeforeWeeklyFeaturePublishDeadline(new Date("2026-09-05T09:00:00+09:00"), prepare),
     false,
+  );
+});
+
+test("Vercel Cron은 토요일 KST 07:00 준비, 08:00·08:30 재시도와 매시 공개를 고정한다", () => {
+  const scheduleByPath = new Map(
+    vercelConfig.crons.map((cron) => [cron.path, cron.schedule]),
+  );
+
+  assert.equal(scheduleByPath.get("/api/cron/weekly-gyeonggi-feature/prepare"), "0 22 * * 5");
+  assert.equal(scheduleByPath.get("/api/cron/weekly-gyeonggi-feature/retry"), "0,30 23 * * 5");
+  assert.equal(scheduleByPath.get("/api/cron/publish-scheduled"), "0 * * * *");
+  assert.equal(
+    vercelConfig.crons.filter(
+      (cron) => cron.path === "/api/cron/weekly-gyeonggi-feature/retry",
+    ).length,
+    1,
   );
 });
 
