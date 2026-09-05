@@ -257,6 +257,64 @@ test("주제와 기사 검사는 서로 다른 공식 근거 세 건을 강제�
   assert.match(validateDraftForSources(tooShort, evidence).join(" "), /2500자 미만/);
 });
 
+test("공식자료가 촉구·평가 단계이면 예타 통과 완료 표현을 로컬에서 차단한다", () => {
+  const pendingEvidence = evidence.map((source) => ({
+    ...source,
+    bodyText: `${source.bodyText} 예비타당성조사 통과를 촉구했으며 평가를 앞두고 있다.`,
+  }));
+  for (const title of [
+    "포천~철원 고속도로 예타 통과 이후의 후속 과제를 점검한다",
+    "포천~철원 고속도로 예타 최종 통과, 후속 사업 본격화",
+    "포천~철원 고속도로 예타 통과로 사업 추진 본궤도",
+    "포천~철원 고속도로 예타는 통과했다",
+  ]) {
+    assert.match(
+      validateDraftForSources({ ...draft, title }, pendingEvidence).join(" "),
+      /통과를 확정하지 않았는데 기사에서 통과 완료/,
+      title,
+    );
+  }
+
+  const prematurePassage = {
+    ...draft,
+    title: "포천~철원 고속도로 예타 통과 이후의 후속 과제를 점검한다",
+  };
+  for (const denial of [
+    "예비타당성조사를 통과했다는 주장은 사실이 아니며 현재 평가 중이다",
+    "예비타당성조사를 통과했다고 발표하지 않았다고 밝혔다",
+    "예비타당성조사를 통과했다고 발표한 바 없다고 밝혔다",
+    "예비타당성조사가 통과됐다고 확인할 수 없다고 밝혔다",
+    "예비타당성조사를 통과했다고 발표했다는 보도는 허위다",
+    "예비타당성조사를 통과했다고 발표했으나 해당 내용은 오류다",
+    "예비타당성조사를 통과했다는 보도는 사실무근이다",
+    "예비타당성조사를 통과했다는 보도는 잘못된 내용이다",
+    "예비타당성조사를 통과했다고 발표했다는 내용은 사실과 다르다",
+    "예비타당성조사를 통과했다고 발표했다는 보도는 부정확하다",
+  ]) {
+    const deniedEvidence = pendingEvidence.map((source, index) => ({
+      ...source,
+      bodyText: index === 0 ? `${source.bodyText} ${denial}.` : source.bodyText,
+    }));
+    assert.match(
+      validateDraftForSources(prematurePassage, deniedEvidence).join(" "),
+      /통과를 확정하지 않았는데 기사에서 통과 완료/,
+      denial,
+    );
+  }
+
+  const confirmedEvidence = pendingEvidence.map((source, index) => ({
+    ...source,
+    bodyText:
+      index === 0
+        ? `${source.bodyText} 관계기관은 해당 사업이 예비타당성조사를 통과했다고 발표했다.`
+        : source.bodyText,
+  }));
+  assert.doesNotMatch(
+    validateDraftForSources(prematurePassage, confirmedEvidence).join(" "),
+    /통과를 확정하지 않았는데 기사에서 통과 완료/,
+  );
+});
+
 test("이번 주 주제 seed는 직접 관련 2건부터 허용하되 최종 3건 기준은 낮추지 않는다", () => {
   const seedTopic = {
     headline: "포천-철원 고속도로 예비타당성조사의 현재 단계",

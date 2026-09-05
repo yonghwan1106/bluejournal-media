@@ -862,6 +862,79 @@ export function validateTopicSelection(
   return errors;
 }
 
+function weeklyFeatureStatementSegments(values: readonly string[]): string[] {
+  return values.flatMap((value) =>
+    String(value ?? "")
+      .split(/[\r\n]+|(?<=[.!?。！？])\s+/u)
+      .map(normalizeWeeklyFeatureIssueText)
+      .filter(Boolean),
+  );
+}
+
+function claimsCompletedPreliminaryFeasibilityPassage(statement: string): boolean {
+  const subject = /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도)?/u;
+  if (!subject.test(statement)) return false;
+  const explicitCompletion =
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도)?\s*(?:최종\s+)?통과(?:했\S*|한(?:\s|$)|해(?:\s|$)|하여\S*|됐\S*|되었\S*|됨(?:\s|$)|로(?:\s|$)|가\s+확정\S*|\s+(?:이후|후|완료|확정|후속|본격))/u;
+  if (explicitCompletion.test(statement)) return true;
+
+  const bareFinalPassage =
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도)?\s*최종\s+통과(?:\s|$)/u.test(
+      statement,
+    );
+  const pendingPassage =
+    /통과(?:를|가)?\s*(?:촉구|요청|건의|위한|위해|목표|여부|기대|희망|필요|전제|가능성)/u.test(
+      statement,
+    );
+  return bareFinalPassage && !pendingPassage;
+}
+
+function deniesOrQualifiesPreliminaryFeasibilityPassage(statement: string): boolean {
+  const hasSubjectAndPassage =
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도)?\s*(?:최종\s+)?통과/u.test(
+      statement,
+    );
+  if (!hasSubjectAndPassage) return false;
+  return (
+    /통과(?:를|가)?\s*(?:촉구|요청|건의|위한|위해|목표|기대|희망|필요|전제|앞두)/u.test(
+      statement,
+    ) ||
+    explicitlyDeniesPreliminaryFeasibilityPassage(statement)
+  );
+}
+
+function explicitlyDeniesPreliminaryFeasibilityPassage(statement: string): boolean {
+  return (
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도)?\s*(?:최종\s+)?통과/u.test(
+      statement,
+    ) &&
+    /(?:통과|발표|밝|확인|확정).{0,80}(?:사실이\s+아니|사실무근|허위|오보|오류|잘못(?:된|됐다|되었|이다)|아니(?:며|다|라고|라는)|않(?:았|는|다|다고|은|음)|없(?:다|다고|었|는|음)|못(?:했|한|하|함|한다)|부인|정정|철회|미정|확인되지|확정되지|가정|경우|여부)/u.test(
+      statement,
+    )
+  );
+}
+
+function confirmsPreliminaryFeasibilityPassage(statement: string): boolean {
+  const subject = /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도)?/u;
+  if (!subject.test(statement)) return false;
+  if (deniesOrQualifiesPreliminaryFeasibilityPassage(statement)) return false;
+
+  return (
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도|에서)?\s*(?:최종\s+)?(?:통과했다고|통과됐다고|통과되었다고)\s+(?:공식(?:적으로)?\s+)?(?:발표했(?:다|습니다)|밝혔(?:다|습니다)|확인했(?:다|습니다)|발표함|밝힘|확인함)$/u.test(
+      statement,
+    ) ||
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도|에서)?\s*(?:최종\s+)?(?:통과했다|통과됐다|통과되었다|통과했습니다|통과됐습니다|통과되었습니다|통과함)$/u.test(
+      statement,
+    ) ||
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도|에서)?\s*(?:최종\s+)?통과(?:가|를)\s+확정(?:됐다|되었다|됐습니다|되었습니다|했다|했습니다|됨)$/u.test(
+      statement,
+    ) ||
+    /(?:예타|예비\s*타당성\s*조사)(?:는|은|가|를|도|에서)?\s*(?:최종\s+)?통과$/u.test(
+      statement,
+    )
+  );
+}
+
 export function validateDraftForSources(
   draft: WeeklyFeatureDraft,
   evidence: WeeklyFeatureEvidence[],
@@ -909,6 +982,31 @@ export function validateDraftForSources(
   if (paragraphCount < 10) errors.push("5개 섹션의 전체 본문 문단이 10개 미만입니다.");
   if (citedIds.size < MIN_WEEKLY_FEATURE_SOURCES) {
     errors.push(`본문에서 인용한 공식 근거가 ${MIN_WEEKLY_FEATURE_SOURCES}개 미만입니다.`);
+  }
+
+  const articleStatements = weeklyFeatureStatementSegments([
+    draft.title,
+    draft.subtitle,
+    draft.lead,
+    ...draft.sections.flatMap((section) => [section.heading, ...section.paragraphs]),
+    draft.conclusion,
+  ]);
+  const evidenceStatements = weeklyFeatureStatementSegments(
+    evidence.flatMap((source) => [source.title, source.summary, source.bodyText]),
+  );
+  const claimsPreliminaryFeasibilityPassage = articleStatements.some(
+    claimsCompletedPreliminaryFeasibilityPassage,
+  );
+  const evidenceExplicitlyDeniesPreliminaryFeasibilityPassage = evidenceStatements.some(
+    explicitlyDeniesPreliminaryFeasibilityPassage,
+  );
+  const evidenceConfirmsPreliminaryFeasibilityPassage =
+    !evidenceExplicitlyDeniesPreliminaryFeasibilityPassage &&
+    evidenceStatements.some(confirmsPreliminaryFeasibilityPassage);
+  if (claimsPreliminaryFeasibilityPassage && !evidenceConfirmsPreliminaryFeasibilityPassage) {
+    errors.push(
+      "공식자료가 예비타당성조사 통과를 확정하지 않았는데 기사에서 통과 완료로 표현했습니다.",
+    );
   }
 
   return [...new Set(errors)];
