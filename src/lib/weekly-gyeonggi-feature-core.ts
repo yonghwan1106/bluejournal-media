@@ -4,6 +4,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const MIN_WEEKLY_FEATURE_SOURCES = 3;
 export const MIN_WEEKLY_FEATURE_BODY_CHARS = 2_500;
 export const MAX_WEEKLY_FEATURE_BODY_CHARS = 5_000;
+export const MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES = 2;
 export const WEEKLY_FEATURE_SECTION_ROLES = [
   "현황",
   "원인",
@@ -61,6 +62,28 @@ export type WeeklyFeatureDraft = {
 };
 
 export type WeeklyFeatureImageKind = "ai" | "fallback-svg";
+
+/**
+ * 구조화 출력 모델이 섹션을 다른 순서로 반환해도 편집 규격의 순서로 고정한다.
+ * 중복·누락 역할은 그대로 남겨 후속 구조 검사가 발행을 차단하도록 한다.
+ */
+export function canonicalizeWeeklyFeatureSections(
+  sections: WeeklyFeatureSection[],
+): WeeklyFeatureSection[] {
+  const roleOrder = new Map<WeeklyFeatureSectionRole, number>(
+    WEEKLY_FEATURE_SECTION_ROLES.map((role, index) => [role, index]),
+  );
+
+  return sections
+    .map((section, originalIndex) => ({ section, originalIndex }))
+    .sort((left, right) => {
+      const roleDifference =
+        (roleOrder.get(left.section.role) ?? Number.MAX_SAFE_INTEGER) -
+        (roleOrder.get(right.section.role) ?? Number.MAX_SAFE_INTEGER);
+      return roleDifference || left.originalIndex - right.originalIndex;
+    })
+    .map(({ section }) => section);
+}
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
