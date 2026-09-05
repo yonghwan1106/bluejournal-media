@@ -23,6 +23,11 @@ import {
   parseWeeklyFeatureListHtml,
 } from "../src/lib/weekly-gyeonggi-feature-sources";
 
+const weeklyFeatureAutomationSource = readFileSync(
+  new URL("../src/lib/weekly-gyeonggi-feature.ts", import.meta.url),
+  "utf8",
+);
+
 const evidence: WeeklyFeatureEvidence[] = [1, 2, 3].map((number) => ({
   id: `s017-${number}`,
   title: `경기도 공식자료 ${number}`,
@@ -171,6 +176,16 @@ test("생성 섹션을 편집 규격 순서로 고정하고 RSI 수정은 최대
     "정렬이 중복 역할이나 누락 역할을 정상 구조로 위장하면 안 된다",
   );
   assert.equal(MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES, 2);
+});
+
+test("기사 생성과 RSI 판정 프롬프트가 절차 상태·출처 매핑·판정 경계를 고정한다", () => {
+  assert.match(weeklyFeatureAutomationSource, /통과 건의·촉구·기대·추진·검토/);
+  assert.match(weeklyFeatureAutomationSource, /사업 절차 상태를 원문 표현대로 정확히 구분/);
+  assert.match(weeklyFeatureAutomationSource, /section\.sourceIds는 공식자료 JSON의 id에 매핑/);
+  assert.match(weeklyFeatureAutomationSource, /기사 JSON에 URL 문자열이 직접 없다는 이유만으로/);
+  assert.match(weeklyFeatureAutomationSource, /반드시 REVISE로 판정/);
+  assert.match(weeklyFeatureAutomationSource, /기사 전체를 다시 써도 안전한 발행이 불가능/);
+  assert.match(weeklyFeatureAutomationSource, /누락·부정확·단정 표현은 HOLD 사유가 아니다/);
 });
 
 test("도청 s017과 시군 s003 목록은 서로 다른 실제 경로와 행 selector로 파싱한다", () => {
