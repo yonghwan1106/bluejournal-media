@@ -3,13 +3,33 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { authorizeCronRequest } from "../src/lib/cron-auth";
 import {
+  DEFAULT_WEEKLY_FEATURE_RSI_FALLBACK_MODELS,
+  DEFAULT_WEEKLY_FEATURE_RSI_MODEL,
+  DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS,
+  DEFAULT_WEEKLY_FEATURE_TEXT_MODEL,
+  MAX_WEEKLY_FEATURE_SOURCES,
+  MIN_WEEKLY_FEATURE_CURRENT_SOURCES,
   MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES,
+  WEEKLY_FEATURE_INVOCATION_BUDGET_MS,
+  WEEKLY_FEATURE_MIN_STAGE_REMAINING_MS,
   WEEKLY_FEATURE_SECTION_ROLES,
+  assertWeeklyFeatureInvocationBudget,
+  assertWeeklyFeatureOfficialUrl,
   buildWeeklyFeatureBodyHtml,
   buildWeeklyFeatureFallbackSvg,
   buildWeeklyFeatureSchedule,
   canonicalizeWeeklyFeatureSections,
+  createWeeklyFeatureInvocationBudget,
+  createWeeklyFeatureStageSignal,
   isBeforeWeeklyFeaturePublishDeadline,
+  matchesWeeklyFeatureIssueTitle,
+  mergeWeeklyFeatureEvidence,
+  normalizeWeeklyFeatureIssueText,
+  remainingWeeklyFeatureInvocationMs,
+  resolveWeeklyFeatureGatewayFallbackModels,
+  selectWeeklyFeatureCurrentCandidates,
+  selectWeeklyFeatureSupplementalCandidates,
+  shouldSearchWeeklyFeaturePimac,
   validateDraftForSources,
   validateTopicSelection,
   weeklyFeatureDraftText,
@@ -18,7 +38,12 @@ import {
 } from "../src/lib/weekly-gyeonggi-feature-core";
 import {
   WEEKLY_FEATURE_BOARDS,
+  buildPimacProjectSearchUrl,
+  buildWeeklyFeatureArchiveSearchUrl,
   buildWeeklyFeatureListUrl,
+  parsePimacProjectDetailHtml,
+  parsePimacProjectSearchHtml,
+  parseWeeklyFeatureArchiveListHtml,
   parseWeeklyFeatureDetailHtml,
   parseWeeklyFeatureListHtml,
 } from "../src/lib/weekly-gyeonggi-feature-sources";
@@ -30,7 +55,7 @@ const weeklyFeatureAutomationSource = readFileSync(
 
 const evidence: WeeklyFeatureEvidence[] = [1, 2, 3].map((number) => ({
   id: `s017-${number}`,
-  title: `경기도 공식자료 ${number}`,
+  title: `포천-철원 고속도로 공식자료 ${number}`,
   date: "2026-09-04",
   url: `https://gnews.gg.go.kr/briefing/brief_gongbo_view.do?BS_CODE=s017&number=${number}`,
   sourceName: "경기도청 보도자료",
@@ -110,6 +135,88 @@ test("Asia/Seoul 월요일 자정에 새 주차키로 전환한다", () => {
   assert.equal(after.weekStart, "2026-09-07");
 });
 
+test("245초 전역 예산은 단계별 신호와 결합되고 강제 종료 전에 새 단계를 차단한다", () => {
+  assert.equal(WEEKLY_FEATURE_INVOCATION_BUDGET_MS, 245_000);
+  assert.equal(WEEKLY_FEATURE_MIN_STAGE_REMAINING_MS, 5_000);
+  assert.equal(WEEKLY_FEATURE_INVOCATION_BUDGET_MS <= 250_000, true);
+
+  const budget = createWeeklyFeatureInvocationBudget(1_000, 10_000);
+  assert.equal(budget.deadlineAtMs, 11_000);
+  assert.equal(remainingWeeklyFeatureInvocationMs(budget, 5_000), 6_000);
+  assert.equal(assertWeeklyFeatureInvocationBudget(budget, "테스트 단계", 5_000), 6_000);
+  assert.throws(
+    () => assertWeeklyFeatureInvocationBudget(budget, "마감 직전 단계", 6_001),
+    /전역 실행시간 예산 소진/,
+  );
+
+  const globalController = new AbortController();
+  const localController = new AbortController();
+  const combined = createWeeklyFeatureStageSignal({
+    budget: { deadlineAtMs: Date.now() + 20_000, signal: globalController.signal },
+    stage: "결합 신호 테스트",
+    timeoutMs: 10_000,
+    signals: [localController.signal],
+  });
+  assert.equal(combined.aborted, false);
+  localController.abort(new Error("개별 단계 중단"));
+  assert.equal(combined.aborted, true);
+
+  globalController.abort(new Error("전역 중단"));
+  assert.throws(
+    () =>
+      createWeeklyFeatureStageSignal({
+        budget: { deadlineAtMs: Date.now() + 20_000, signal: globalController.signal },
+        stage: "중단 후 단계",
+        timeoutMs: 10_000,
+      }),
+    /전역 실행시간 예산 소진/,
+  );
+});
+
+test("공식자료 URL은 gnews와 PIMAC의 비표준 포트를 거부한다", () => {
+  assert.equal(
+    assertWeeklyFeatureOfficialUrl(
+      "https://gnews.gg.go.kr/briefing/brief_gongbo_view.do?BS_CODE=s017&number=71407",
+    ).hostname,
+    "gnews.gg.go.kr",
+  );
+  assert.throws(
+    () =>
+      assertWeeklyFeatureOfficialUrl(
+        "https://gnews.gg.go.kr:444/briefing/brief_gongbo_view.do?BS_CODE=s017&number=71407",
+      ),
+    /허용되지 않은 공식자료 URL/,
+  );
+  assert.throws(
+    () =>
+      assertWeeklyFeatureOfficialUrl(
+        "https://pimac.kdi.re.kr:8443/study/fina_view.jsp?exmn_no=312",
+      ),
+    /허용되지 않은 공식자료 URL/,
+  );
+});
+
+test("실행기는 전역 예산을 외부 I/O 전 단계에 전파한다", () => {
+  assert.match(
+    weeklyFeatureAutomationSource,
+    /const invocationBudget = createWeeklyFeatureInvocationBudget\(\)/,
+  );
+  assert.match(
+    weeklyFeatureAutomationSource,
+    /collectWeeklyGyeonggiCandidates\(schedule, invocationBudget\)/,
+  );
+  assert.equal(
+    (weeklyFeatureAutomationSource.match(/createWeeklyFeatureStageSignal\(/g) ?? []).length >= 9,
+    true,
+    "공식 fetch, AI, 이미지 검증, R2 업로드에 결합 신호가 있어야 한다",
+  );
+  assert.match(weeklyFeatureAutomationSource, /\{ abortSignal \},\s*\);/);
+  assert.doesNotMatch(
+    weeklyFeatureAutomationSource,
+    /AbortSignal\.timeout\((TEXT_TIMEOUT_MS|IMAGE_TIMEOUT_MS|PUBLIC_IMAGE_TIMEOUT_MS)\)/,
+  );
+});
+
 test("주제와 기사 검사는 서로 다른 공식 근거 세 건을 강제한다", () => {
   assert.deepEqual(
     validateTopicSelection(
@@ -118,6 +225,7 @@ test("주제와 기사 검사는 서로 다른 공식 근거 세 건을 강제�
         angle: "세 공식자료를 통해 주민 영향과 실행 과제를 함께 살핀다.",
         rationale: "동일 주간에 공개된 자료가 하나의 정책 실행 흐름을 보여준다.",
         sourceIds: evidence.map((source) => source.id),
+        archiveTerms: ["포천", "철원", "고속도로"],
       },
       evidence,
     ),
@@ -144,6 +252,65 @@ test("주제와 기사 검사는 서로 다른 공식 근거 세 건을 강제�
     section.paragraphs = ["공식자료로 확인된 내용을 설명하는 짧은 검증 문단입니다.".repeat(2), "후속 확인이 필요합니다.".repeat(4)];
   });
   assert.match(validateDraftForSources(tooShort, evidence).join(" "), /2500자 미만/);
+});
+
+test("이번 주 주제 seed는 직접 관련 2건부터 허용하되 최종 3건 기준은 낮추지 않는다", () => {
+  const seedTopic = {
+    headline: "포천-철원 고속도로 예비타당성조사의 현재 단계",
+    angle: "접경지역 교통망 사업의 조사 단계와 비용·수요 검증 쟁점을 살핀다.",
+    rationale: "경기도와 포천시가 같은 고속도로 사업의 예비타당성조사를 직접 다뤘다.",
+    sourceIds: evidence.slice(0, MIN_WEEKLY_FEATURE_CURRENT_SOURCES).map((source) => source.id),
+    archiveTerms: ["포천", "철원", "고속도로"],
+  };
+
+  assert.deepEqual(
+    validateTopicSelection(seedTopic, evidence, {
+      minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES,
+    }),
+    [],
+  );
+  assert.match(validateTopicSelection(seedTopic, evidence).join(" "), /3개 미만/);
+  assert.match(
+    validateTopicSelection(
+      { ...seedTopic, archiveTerms: ["경기도", "사업"] },
+      evidence,
+      { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
+    ).join(" "),
+    /일반어/,
+  );
+  assert.match(
+    validateTopicSelection(
+      { ...seedTopic, archiveTerms: ["포천", "광역버스"] },
+      evidence,
+      { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
+    ).join(" "),
+    /자료 제목/,
+  );
+});
+
+test("모든 핵심어가 각 제목에 있는 이번 주 자료만 seed로 인정한다", () => {
+  const unrelated = {
+    ...evidence[2],
+    id: "s017-99",
+    title: "경기도, 다른 지역 고속도로 지원계획 발표",
+    url: "https://gnews.gg.go.kr/briefing/brief_gongbo_view.do?BS_CODE=s017&number=99",
+  };
+  const topic = {
+    headline: "포천-철원 고속도로 예비타당성조사의 현재 단계",
+    angle: "접경지역 교통망 사업의 조사 단계와 비용·수요 검증 쟁점을 살핀다.",
+    rationale: "같은 고속도로 현안을 직접 다루는 이번 주 자료만 출발점으로 삼는다.",
+    sourceIds: [evidence[0].id, unrelated.id, evidence[1].id],
+    archiveTerms: ["포천", "철원", "고속도로"],
+  };
+
+  assert.equal(normalizeWeeklyFeatureIssueText("포천~철원  고속도로"), "포천 철원 고속도로");
+  assert.equal(matchesWeeklyFeatureIssueTitle("포천-철원 고속도로 추진", topic.archiveTerms), true);
+  assert.equal(matchesWeeklyFeatureIssueTitle(unrelated.title, topic.archiveTerms), false);
+  assert.deepEqual(
+    selectWeeklyFeatureCurrentCandidates(topic, [...evidence, unrelated]).map((source) => source.id),
+    [evidence[0].id, evidence[1].id],
+    "모델이 unrelated 세 번째 ID를 섞어도 보강 early-return 근거가 되면 안 된다",
+  );
 });
 
 test("생성 섹션을 편집 규격 순서로 고정하고 RSI 수정은 최대 두 회 허용한다", () => {
@@ -188,6 +355,75 @@ test("기사 생성과 RSI 판정 프롬프트가 절차 상태·출처 매핑·
   assert.match(weeklyFeatureAutomationSource, /누락·부정확·단정 표현은 HOLD 사유가 아니다/);
 });
 
+test("AI Gateway 텍스트·RSI 라우팅은 공급자 다변화 폴백과 설정 검증을 강제한다", () => {
+  assert.deepEqual(DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS, [
+    "openai/gpt-5-nano",
+    "google/gemini-2.5-flash-lite",
+  ]);
+  assert.equal(DEFAULT_WEEKLY_FEATURE_RSI_MODEL, "google/gemini-2.5-flash");
+  assert.deepEqual(DEFAULT_WEEKLY_FEATURE_RSI_FALLBACK_MODELS, [
+    "openai/gpt-4.1-mini",
+    "openai/gpt-5.4-nano",
+  ]);
+  assert.equal(
+    new Set(
+      [DEFAULT_WEEKLY_FEATURE_TEXT_MODEL, ...DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS].map(
+        (model) => model.split("/")[0],
+      ),
+    ).size,
+    2,
+  );
+  assert.equal(
+    new Set(
+      [DEFAULT_WEEKLY_FEATURE_RSI_MODEL, ...DEFAULT_WEEKLY_FEATURE_RSI_FALLBACK_MODELS].map(
+        (model) => model.split("/")[0],
+      ),
+    ).size,
+    2,
+  );
+
+  assert.deepEqual(
+    resolveWeeklyFeatureGatewayFallbackModels({
+      primaryModel: "openai/gpt-5.4-nano",
+      configuredModels:
+        " openai/gpt-5-nano, openai/gpt-5.4-nano, openai/gpt-5-nano, google/gemini-2.5-flash-lite ",
+      defaultModels: DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS,
+      envName: "TEST_FALLBACK_MODELS",
+    }),
+    ["openai/gpt-5-nano", "google/gemini-2.5-flash-lite"],
+  );
+  assert.throws(
+    () =>
+      resolveWeeklyFeatureGatewayFallbackModels({
+        primaryModel: "openai/gpt-5.4-nano",
+        configuredModels: "invalid-model",
+        defaultModels: DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS,
+        envName: "TEST_FALLBACK_MODELS",
+      }),
+    /provider\/model/,
+  );
+  assert.throws(
+    () =>
+      resolveWeeklyFeatureGatewayFallbackModels({
+        primaryModel: "openai/gpt-5.4-nano",
+        configuredModels: "openai/gpt-5.4-nano, openai/gpt-5.4-nano",
+        defaultModels: DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS,
+        envName: "TEST_FALLBACK_MODELS",
+      }),
+    /폴백 모델이 하나 이상/,
+  );
+
+  assert.match(weeklyFeatureAutomationSource, /WEEKLY_FEATURE_TEXT_FALLBACK_MODELS/);
+  assert.match(weeklyFeatureAutomationSource, /WEEKLY_FEATURE_RSI_FALLBACK_MODELS/);
+  assert.equal(
+    weeklyFeatureAutomationSource.match(
+      /providerOptions:\s*\{\s*gateway:\s*routing\.gatewayOptions\s*\}/g,
+    )?.length,
+    4,
+    "네 번의 텍스트 생성 호출 모두 Gateway 모델 폴백을 사용해야 한다",
+  );
+});
+
 test("도청 s017과 시군 s003 목록은 서로 다른 실제 경로와 행 selector로 파싱한다", () => {
   const [provincial, municipal] = WEEKLY_FEATURE_BOARDS;
   const provincialUrl = new URL(buildWeeklyFeatureListUrl(provincial, 2));
@@ -224,6 +460,146 @@ test("도청 s017과 시군 s003 목록은 서로 다른 실제 경로와 행 se
     [],
     "도청 목록을 시군 자료로 오표기하면 안 된다",
   );
+});
+
+test("공식 아카이브 제목 검색은 보드별 search 코드를 쓰고 날짜 query를 보내지 않는다", () => {
+  const [provincial, municipal] = WEEKLY_FEATURE_BOARDS;
+  const provincialUrl = new URL(buildWeeklyFeatureArchiveSearchUrl(provincial, "철원", 1));
+  const municipalUrl = new URL(buildWeeklyFeatureArchiveSearchUrl(municipal, "철원~", 1));
+
+  assert.equal(provincialUrl.searchParams.get("search"), "8");
+  assert.equal(municipalUrl.searchParams.get("search"), "1");
+  assert.equal(municipalUrl.searchParams.get("keyword"), "철원");
+  for (const url of [provincialUrl, municipalUrl]) {
+    assert.equal(url.searchParams.has("period_1"), false);
+    assert.equal(url.searchParams.has("period_2"), false);
+  }
+  assert.throws(() => buildWeeklyFeatureArchiveSearchUrl(municipal, "정책", 0), /1 이상의 정수/);
+});
+
+test("5년 공식 아카이브에서 모든 핵심어가 있는 과거 제목만 보강 후보로 고른다", () => {
+  const municipal = WEEKLY_FEATURE_BOARDS[1];
+  const archiveRows = parseWeeklyFeatureArchiveListHtml({
+    html: readFileSync(
+      new URL("./fixtures/weekly-feature-s003-archive-list.html", import.meta.url),
+      "utf8",
+    ),
+    board: municipal,
+    weekStart: "2021-09-05",
+    sourceEnd: "2026-09-05",
+  });
+  assert.deepEqual(
+    archiveRows.map((source) => source.id),
+    ["s003-114684", "s003-105000", "s003-104000", "s003-103000"],
+    "5년보다 오래된 결과는 파싱 단계에서 제외해야 한다",
+  );
+  assert.equal(
+    archiveRows.find((source) => source.id === "s003-105000")?.url,
+    "https://gnews.gg.go.kr/briefing/brief_gongbo_view.do?BS_CODE=s003&number=105000",
+    "검색 query가 상세 근거 URL에 남으면 안 된다",
+  );
+
+  const selected = selectWeeklyFeatureSupplementalCandidates({
+    candidates: archiveRows,
+    currentEvidence: evidence.slice(0, 2),
+    archiveTerms: ["포천", "철원", "고속도로"],
+    weekStart: "2026-08-31",
+    maximum: 4,
+  });
+  assert.deepEqual(selected.map((source) => source.id), ["s003-105000"]);
+});
+
+test("SOC 현안일 때만 PIMAC을 검색하고 숫자 조사 ID와 상세 본문을 안전하게 파싱한다", () => {
+  const topic = {
+    headline: "포천-철원 고속도로 예비타당성조사의 현재 단계",
+    angle: "접경지역 교통망 사업의 조사 단계와 비용·수요 검증 쟁점을 살핀다.",
+    rationale: "같은 고속도로 현안을 직접 다루는 공식자료를 교차 확인한다.",
+    sourceIds: evidence.slice(0, 2).map((source) => source.id),
+    archiveTerms: ["포천", "철원", "고속도로"],
+  };
+  assert.equal(shouldSearchWeeklyFeaturePimac(topic, evidence.slice(0, 2)), true);
+  assert.equal(
+    shouldSearchWeeklyFeaturePimac(
+      {
+        ...topic,
+        headline: "포천시 돌봄 서비스 운영 점검",
+        angle: "지역 돌봄 서비스의 이용 대상과 운영 현황을 확인한다.",
+        archiveTerms: ["포천", "돌봄"],
+      },
+      [{ ...evidence[0], title: "포천시 돌봄 서비스 운영 점검" }],
+    ),
+    false,
+  );
+
+  const pimacSearchUrl = new URL(buildPimacProjectSearchUrl("포천"));
+  assert.equal(pimacSearchUrl.hostname, "pimac.kdi.re.kr");
+  assert.equal(pimacSearchUrl.pathname, "/study/fina_list.jsp");
+  assert.equal(pimacSearchUrl.searchParams.get("pp"), "10");
+
+  const pimacCandidates = parsePimacProjectSearchHtml({
+    html: readFileSync(
+      new URL("./fixtures/weekly-feature-pimac-list.html", import.meta.url),
+      "utf8",
+    ),
+    archiveStart: "2021-09-05",
+    sourceEnd: "2026-09-05",
+  });
+  assert.deepEqual(pimacCandidates.map((source) => source.id), ["pimac-fina-372", "pimac-fina-312"]);
+  const direct = pimacCandidates.find((source) => source.id === "pimac-fina-312");
+  assert.ok(direct);
+  assert.equal(
+    direct.url,
+    "https://pimac.kdi.re.kr/study/fina_view.jsp?exmn_no=312",
+  );
+
+  const parsed = parsePimacProjectDetailHtml(
+    readFileSync(new URL("./fixtures/weekly-feature-pimac-detail.html", import.meta.url), "utf8"),
+    direct,
+  );
+  assert.equal(parsed.title, "포천-철원 고속도로 건설사업");
+  assert.match(parsed.bodyText, /최종 조사 결과와 상이할 수 있다/);
+  assert.throws(
+    () =>
+      parsePimacProjectDetailHtml(
+        readFileSync(
+          new URL("./fixtures/weekly-feature-pimac-detail.html", import.meta.url),
+          "utf8",
+        ),
+        { ...direct, id: "pimac-fina-999" },
+      ),
+    /식별자가 후보와 다릅니다/,
+  );
+});
+
+test("이번 주 seed와 아카이브·PIMAC 근거는 중복 없이 최대 6건으로 합친다", () => {
+  const historicEvidence: WeeklyFeatureEvidence = {
+    id: "s003-105000",
+    title: "포천시, 포천-철원 고속도로 예비타당성조사 대상 사업 선정",
+    date: "2025-04-30",
+    url: "https://gnews.gg.go.kr/briefing/brief_gongbo_view.do?BS_CODE=s003&number=105000",
+    sourceName: "경기도 시군 보도자료",
+    summary: "과거 추진단계 공식 요약",
+    bodyText: "과거 추진단계를 확인하는 공식 본문입니다.".repeat(20),
+  };
+  const pimacEvidence: WeeklyFeatureEvidence = {
+    id: "pimac-fina-312",
+    title: "포천-철원 고속도로 건설사업",
+    date: "2025-06-05",
+    url: "https://pimac.kdi.re.kr/study/fina_view.jsp?exmn_no=312",
+    sourceName: "KDI 공공투자관리센터",
+    summary: "예비타당성조사 현황",
+    bodyText: "공식 사업규모와 조사단계를 확인하는 본문입니다.".repeat(20),
+  };
+  const merged = mergeWeeklyFeatureEvidence(
+    evidence.slice(0, 2),
+    [historicEvidence, pimacEvidence, historicEvidence, ...evidence],
+  );
+
+  assert.deepEqual(
+    merged.map((source) => source.id),
+    [evidence[0].id, evidence[1].id, historicEvidence.id, pimacEvidence.id, evidence[2].id],
+  );
+  assert.equal(merged.length <= MAX_WEEKLY_FEATURE_SOURCES, true);
 });
 
 test("도청·시군 상세 fixture에서 정확한 제목, 날짜, 본문과 요약을 추출한다", () => {
@@ -273,6 +649,8 @@ test("본문은 공식 URL 목록과 이미지 제작 고지를 포함하고 모
   });
 
   assert.match(html, /AI 생성 이미지/);
+  assert.match(html, /경기도 및 관계기관 공식 공개자료/);
+  assert.doesNotMatch(html, /위 경기도 공식 공개자료/);
   assert.equal(html.split("https://").length - 1 >= 4, true);
   assert.doesNotMatch(html, /<script>/i);
   assert.match(html, /&lt;script&gt;/);

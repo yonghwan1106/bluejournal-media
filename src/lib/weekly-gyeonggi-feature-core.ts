@@ -2,9 +2,23 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const MIN_WEEKLY_FEATURE_SOURCES = 3;
+export const MIN_WEEKLY_FEATURE_CURRENT_SOURCES = 2;
+export const MAX_WEEKLY_FEATURE_SOURCES = 6;
 export const MIN_WEEKLY_FEATURE_BODY_CHARS = 2_500;
 export const MAX_WEEKLY_FEATURE_BODY_CHARS = 5_000;
 export const MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES = 2;
+export const WEEKLY_FEATURE_INVOCATION_BUDGET_MS = 245_000;
+export const WEEKLY_FEATURE_MIN_STAGE_REMAINING_MS = 5_000;
+export const DEFAULT_WEEKLY_FEATURE_TEXT_MODEL = "openai/gpt-5.4-nano";
+export const DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS = [
+  "openai/gpt-5-nano",
+  "google/gemini-2.5-flash-lite",
+] as const;
+export const DEFAULT_WEEKLY_FEATURE_RSI_MODEL = "google/gemini-2.5-flash";
+export const DEFAULT_WEEKLY_FEATURE_RSI_FALLBACK_MODELS = [
+  "openai/gpt-4.1-mini",
+  "openai/gpt-5.4-nano",
+] as const;
 export const WEEKLY_FEATURE_SECTION_ROLES = [
   "현황",
   "원인",
@@ -42,6 +56,7 @@ export type WeeklyFeatureTopic = {
   angle: string;
   rationale: string;
   sourceIds: string[];
+  archiveTerms: string[];
 };
 
 export type WeeklyFeatureSection = {
@@ -62,6 +77,334 @@ export type WeeklyFeatureDraft = {
 };
 
 export type WeeklyFeatureImageKind = "ai" | "fallback-svg";
+
+export type WeeklyFeatureInvocationBudget = {
+  deadlineAtMs: number;
+  signal: AbortSignal;
+};
+
+export function createWeeklyFeatureInvocationBudget(
+  nowMs = Date.now(),
+  budgetMs = WEEKLY_FEATURE_INVOCATION_BUDGET_MS,
+): WeeklyFeatureInvocationBudget {
+  if (!Number.isFinite(nowMs) || !Number.isFinite(budgetMs) || budgetMs <= 0) {
+    throw new Error("주간 특집 전역 실행시간 예산이 올바르지 않습니다.");
+  }
+  const durationMs = Math.ceil(budgetMs);
+  return {
+    deadlineAtMs: nowMs + durationMs,
+    signal: AbortSignal.timeout(durationMs),
+  };
+}
+
+export function remainingWeeklyFeatureInvocationMs(
+  budget: WeeklyFeatureInvocationBudget,
+  nowMs = Date.now(),
+): number {
+  return Math.max(0, budget.deadlineAtMs - nowMs);
+}
+
+export function assertWeeklyFeatureInvocationBudget(
+  budget: WeeklyFeatureInvocationBudget,
+  stage: string,
+  nowMs = Date.now(),
+  minimumRemainingMs = WEEKLY_FEATURE_MIN_STAGE_REMAINING_MS,
+): number {
+  const remainingMs = remainingWeeklyFeatureInvocationMs(budget, nowMs);
+  if (budget.signal.aborted || remainingMs < minimumRemainingMs) {
+    throw new Error(
+      `주간 특집 전역 실행시간 예산 소진: ${stage} (남은 시간 ${Math.floor(remainingMs)}ms)`,
+    );
+  }
+  return remainingMs;
+}
+
+export function createWeeklyFeatureStageSignal(params: {
+  budget: WeeklyFeatureInvocationBudget;
+  stage: string;
+  timeoutMs: number;
+  signals?: AbortSignal[];
+}): AbortSignal {
+  const { budget, stage, timeoutMs, signals = [] } = params;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error(`주간 특집 단계 제한시간이 올바르지 않습니다: ${stage}`);
+  }
+  for (const signal of signals) {
+    if (signal.aborted) {
+      throw new Error(`주간 특집 단계 시작 전에 중단됨: ${stage}`);
+    }
+  }
+  const remainingMs = assertWeeklyFeatureInvocationBudget(budget, stage);
+  const stageTimeoutMs = Math.max(1, Math.min(Math.ceil(timeoutMs), Math.floor(remainingMs)));
+  return AbortSignal.any([
+    budget.signal,
+    ...signals,
+    AbortSignal.timeout(stageTimeoutMs),
+  ]);
+}
+
+function hasOnlyWeeklyFeatureSearchParams(url: URL, allowed: ReadonlySet<string>): boolean {
+  return [...url.searchParams.keys()].every((key) => allowed.has(key));
+}
+
+export function assertWeeklyFeatureOfficialUrl(value: string): URL {
+  const url = new URL(value);
+  if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash) {
+    throw new Error(`허용되지 않은 공식자료 URL: ${value}`);
+  }
+
+  const pathname = url.pathname.replace(/;jsessionid=[^/]+$/i, "");
+  if (url.hostname === "gnews.gg.go.kr") {
+    if (pathname === "/briefing/brief_gongbo_view.do") {
+      const boardCode = url.searchParams.get("BS_CODE");
+      const number = url.searchParams.get("number");
+      if (
+        hasOnlyWeeklyFeatureSearchParams(url, new Set(["BS_CODE", "number"])) &&
+        (boardCode === "s017" || boardCode === "s003") &&
+        Boolean(number && /^\d+$/.test(number))
+      ) {
+        return url;
+      }
+    }
+
+    const expectedBoard =
+      pathname === "/briefing/brief_gongbo.do"
+        ? { code: "s017", search: "8" }
+        : pathname === "/briefing/brief_sigun.do"
+          ? { code: "s003", search: "1" }
+          : null;
+    if (expectedBoard) {
+      const page = url.searchParams.get("page");
+      const search = url.searchParams.get("search");
+      const keyword = url.searchParams.get("keyword");
+      const searchPairValid =
+        search === null && keyword === null
+          ? true
+          : search === expectedBoard.search && Boolean(keyword && keyword.length <= 30);
+      if (
+        hasOnlyWeeklyFeatureSearchParams(
+          url,
+          new Set(["page", "BS_CODE", "search", "keyword"]),
+        ) &&
+        url.searchParams.get("BS_CODE") === expectedBoard.code &&
+        Boolean(page && /^\d+$/.test(page) && Number(page) >= 1) &&
+        searchPairValid
+      ) {
+        return url;
+      }
+    }
+  }
+
+  if (url.hostname === "pimac.kdi.re.kr") {
+    if (
+      pathname === "/study/fina_list.jsp" &&
+      hasOnlyWeeklyFeatureSearchParams(url, new Set(["pp", "bizNm"])) &&
+      url.searchParams.get("pp") === "10" &&
+      Boolean(url.searchParams.get("bizNm"))
+    ) {
+      return url;
+    }
+    if (
+      pathname === "/study/fina_view.jsp" &&
+      hasOnlyWeeklyFeatureSearchParams(url, new Set(["exmn_no"])) &&
+      /^\d+$/.test(url.searchParams.get("exmn_no") ?? "")
+    ) {
+      return url;
+    }
+  }
+
+  throw new Error(`허용되지 않은 공식자료 URL: ${value}`);
+}
+
+const GENERIC_WEEKLY_FEATURE_ARCHIVE_TERMS = new Set([
+  "경기",
+  "경기도",
+  "공식자료",
+  "관리",
+  "관련",
+  "개선",
+  "계획",
+  "공동",
+  "대책",
+  "도민",
+  "발표",
+  "보도자료",
+  "사업",
+  "시민",
+  "운영",
+  "예정",
+  "예타",
+  "정책",
+  "주민",
+  "지원",
+  "지역",
+  "추진",
+  "통과",
+  "촉구",
+  "현안",
+  "확대",
+  "확정",
+]);
+
+/** 검색 결과의 구두점 차이를 없애 동일 사업명 여부를 보수적으로 비교한다. */
+export function normalizeWeeklyFeatureIssueText(value: string): string {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z\p{Script=Hangul}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function isGenericWeeklyFeatureArchiveTerm(value: string): boolean {
+  const normalized = normalizeWeeklyFeatureIssueText(value);
+  return (
+    !normalized ||
+    normalized.split(" ").every((term) => GENERIC_WEEKLY_FEATURE_ARCHIVE_TERMS.has(term))
+  );
+}
+
+/** 모든 핵심어가 제목에 직접 나타날 때만 같은 현안의 보강 자료로 인정한다. */
+export function matchesWeeklyFeatureIssueTitle(title: string, archiveTerms: string[]): boolean {
+  const normalizedTitle = normalizeWeeklyFeatureIssueText(title);
+  const normalizedTerms = [
+    ...new Set(archiveTerms.map(normalizeWeeklyFeatureIssueText).filter(Boolean)),
+  ];
+  return (
+    normalizedTerms.length >= 2 &&
+    normalizedTerms.length <= 4 &&
+    normalizedTerms.every(
+      (term) => !isGenericWeeklyFeatureArchiveTerm(term) && normalizedTitle.includes(term),
+    )
+  );
+}
+
+export function selectWeeklyFeatureCurrentCandidates(
+  topic: WeeklyFeatureTopic,
+  candidates: WeeklyFeatureCandidate[],
+): WeeklyFeatureCandidate[] {
+  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const selected: WeeklyFeatureCandidate[] = [];
+  const seen = new Set<string>();
+  for (const id of topic.sourceIds) {
+    const candidate = candidateById.get(id);
+    if (
+      !candidate ||
+      seen.has(candidate.id) ||
+      !matchesWeeklyFeatureIssueTitle(candidate.title, topic.archiveTerms)
+    ) {
+      continue;
+    }
+    seen.add(candidate.id);
+    selected.push(candidate);
+  }
+  return selected;
+}
+
+export function shouldSearchWeeklyFeaturePimac(
+  topic: WeeklyFeatureTopic,
+  currentSources: WeeklyFeatureCandidate[],
+): boolean {
+  const subject = normalizeWeeklyFeatureIssueText(
+    [
+      topic.headline,
+      topic.angle,
+      ...topic.archiveTerms,
+      ...currentSources.map((source) => source.title),
+    ].join(" "),
+  );
+  return /(?:예타|예비타당성|타당성|고속도로|철도|도로|교량|터널|공항|항만|soc|건설)/i.test(
+    subject,
+  );
+}
+
+export function mergeWeeklyFeatureEvidence(
+  currentEvidence: WeeklyFeatureEvidence[],
+  supplementalEvidence: WeeklyFeatureEvidence[],
+  maximum = MAX_WEEKLY_FEATURE_SOURCES,
+): WeeklyFeatureEvidence[] {
+  const merged: WeeklyFeatureEvidence[] = [];
+  const ids = new Set<string>();
+  const urls = new Set<string>();
+
+  for (const source of [...currentEvidence, ...supplementalEvidence]) {
+    if (ids.has(source.id) || urls.has(source.url)) continue;
+    ids.add(source.id);
+    urls.add(source.url);
+    merged.push(source);
+    if (merged.length >= maximum) break;
+  }
+
+  return merged;
+}
+
+export function selectWeeklyFeatureSupplementalCandidates(params: {
+  candidates: WeeklyFeatureCandidate[];
+  currentEvidence: WeeklyFeatureEvidence[];
+  archiveTerms: string[];
+  weekStart: string;
+  maximum: number;
+}): WeeklyFeatureCandidate[] {
+  const currentIds = new Set(params.currentEvidence.map((source) => source.id));
+  const currentUrls = new Set(params.currentEvidence.map((source) => source.url));
+  const byUrl = new Map<string, WeeklyFeatureCandidate>();
+
+  for (const candidate of params.candidates) {
+    if (
+      candidate.date >= params.weekStart ||
+      currentIds.has(candidate.id) ||
+      currentUrls.has(candidate.url) ||
+      !matchesWeeklyFeatureIssueTitle(candidate.title, params.archiveTerms)
+    ) {
+      continue;
+    }
+    const existing = byUrl.get(candidate.url);
+    if (!existing || candidate.date > existing.date) byUrl.set(candidate.url, candidate);
+  }
+
+  return [...byUrl.values()]
+    .sort((left, right) => right.date.localeCompare(left.date) || left.id.localeCompare(right.id))
+    .slice(0, params.maximum);
+}
+
+const GATEWAY_MODEL_SLUG_PATTERN =
+  /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i;
+
+export function validateWeeklyFeatureGatewayModelSlug(value: string, label: string): string {
+  const model = value.trim();
+  if (!GATEWAY_MODEL_SLUG_PATTERN.test(model)) {
+    throw new Error(`${label}은 provider/model 형식이어야 합니다: ${model || "(빈 값)"}`);
+  }
+  return model;
+}
+
+export function resolveWeeklyFeatureGatewayFallbackModels(params: {
+  primaryModel: string;
+  configuredModels?: string;
+  defaultModels: readonly string[];
+  envName: string;
+}): string[] {
+  const { primaryModel, configuredModels, defaultModels, envName } = params;
+  const validatedPrimary = validateWeeklyFeatureGatewayModelSlug(primaryModel, "주 모델");
+  const hasConfiguredModels = Boolean(configuredModels?.trim());
+  const rawModels = hasConfiguredModels ? configuredModels!.split(",") : [...defaultModels];
+  const seen = new Set([validatedPrimary]);
+  const fallbacks: string[] = [];
+
+  for (const rawModel of rawModels) {
+    const candidate = rawModel.trim();
+    if (!candidate) continue;
+    const model = validateWeeklyFeatureGatewayModelSlug(candidate, envName);
+    if (seen.has(model)) continue;
+    seen.add(model);
+    fallbacks.push(model);
+  }
+
+  if (fallbacks.length === 0) {
+    throw new Error(`${envName}에는 주 모델과 다른 유효한 폴백 모델이 하나 이상 필요합니다.`);
+  }
+  return fallbacks;
+}
 
 /**
  * 구조화 출력 모델이 섹션을 다른 순서로 반환해도 편집 규격의 순서로 고정한다.
@@ -137,19 +480,41 @@ export function isBeforeWeeklyFeaturePublishDeadline(
 export function validateTopicSelection(
   topic: WeeklyFeatureTopic,
   candidates: WeeklyFeatureCandidate[],
+  options: { minimumSources?: number } = {},
 ): string[] {
   const errors: string[] = [];
+  const minimumSources = options.minimumSources ?? MIN_WEEKLY_FEATURE_SOURCES;
   const knownIds = new Set(candidates.map((candidate) => candidate.id));
   const selectedIds = [...new Set(topic.sourceIds.map((id) => id.trim()).filter(Boolean))];
+  const selectedTitles = candidates
+    .filter((candidate) => selectedIds.includes(candidate.id))
+    .map((candidate) => candidate.title)
+    .join(" ");
+  const archiveTerms = [
+    ...new Set(topic.archiveTerms.map(normalizeWeeklyFeatureIssueText).filter(Boolean)),
+  ];
 
   if (topic.headline.trim().length < 10) errors.push("주제 제목이 너무 짧습니다.");
   if (topic.angle.trim().length < 20) errors.push("취재 관점이 충분히 구체적이지 않습니다.");
   if (topic.rationale.trim().length < 20) errors.push("주제 선정 근거가 충분하지 않습니다.");
-  if (selectedIds.length < MIN_WEEKLY_FEATURE_SOURCES) {
-    errors.push(`서로 다른 공식 근거가 ${MIN_WEEKLY_FEATURE_SOURCES}개 미만입니다.`);
+  if (selectedIds.length < minimumSources) {
+    errors.push(`서로 다른 공식 근거가 ${minimumSources}개 미만입니다.`);
   }
   if (selectedIds.some((id) => !knownIds.has(id))) {
     errors.push("후보 목록에 없는 출처 ID가 포함됐습니다.");
+  }
+  if (archiveTerms.length < 2 || archiveTerms.length > 4) {
+    errors.push("과거 공식자료 검색 핵심어는 서로 다른 2~4개여야 합니다.");
+  }
+  if (archiveTerms.some((term) => term.length < 2 || term.length > 30)) {
+    errors.push("과거 공식자료 검색 핵심어는 각각 2~30자여야 합니다.");
+  }
+  if (archiveTerms.some((term) => isGenericWeeklyFeatureArchiveTerm(term))) {
+    errors.push("과거 공식자료 검색 핵심어에 일반어만 사용할 수 없습니다.");
+  }
+  const normalizedSelectedTitles = normalizeWeeklyFeatureIssueText(selectedTitles);
+  if (archiveTerms.some((term) => !normalizedSelectedTitles.includes(term))) {
+    errors.push("과거 공식자료 검색 핵심어는 선택한 이번 주 자료 제목에서 확인돼야 합니다.");
   }
 
   return errors;
@@ -265,7 +630,7 @@ export function buildWeeklyFeatureBodyHtml(params: {
         `<li style="margin-bottom:.55em"><a href="${escapeFeatureHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeFeatureHtml(source.title)}</a> <span style="color:#666">(${escapeFeatureHtml(source.date)}, ${escapeFeatureHtml(source.sourceName)})</span></li>`,
     ),
     "</ol>",
-    `<p style="margin-top:1.4em;color:#666;font-size:13px">이 기사는 위 경기도 공식 공개자료를 교차 검토해 작성했습니다. 링크는 독자가 원문과 수치를 직접 확인할 수 있도록 함께 제공합니다.</p>`,
+    `<p style="margin-top:1.4em;color:#666;font-size:13px">이 기사는 위 경기도 및 관계기관 공식 공개자료를 교차 검토해 작성했습니다. 링크는 독자가 원문과 수치를 직접 확인할 수 있도록 함께 제공합니다.</p>`,
     "</div>",
   );
 
