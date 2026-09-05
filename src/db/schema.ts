@@ -58,6 +58,8 @@ export const articles = pgTable(
     bodyText: text("body_text"),
     source: varchar("source", { length: 200 }),
     sourceUrl: varchar("source_url", { length: 1000 }),
+    // 서버 자동화 멱등키. 일반/수동 기사는 null, 자동화 기사는 실행 단위로 유일하다.
+    automationKey: varchar("automation_key", { length: 100 }).unique(),
     // MySQL json → PG jsonb
     tags: jsonb("tags").$type<string[]>().default([]),
     viewCount: integer("view_count").notNull().default(0),
@@ -208,6 +210,40 @@ export const cronRuns = pgTable(
   (t) => [index("cron_runs_runat_idx").on(t.runAt)],
 );
 
+/**
+ * 경기 현안 주간특집 실행 상태.
+ * run_key PK를 먼저 선점해 Vercel Cron 중복 전달과 07:00/08:00 재시도가
+ * 동시에 같은 기사를 만들지 못하게 한다. cron_runs는 관측 로그, 이 테이블은 멱등 상태다.
+ */
+export const weeklyFeatureRuns = pgTable(
+  "weekly_feature_runs",
+  {
+    runKey: varchar("run_key", { length: 80 }).primaryKey(),
+    weekStart: date("week_start").notNull(),
+    publishAt: ts("publish_at").notNull(),
+    state: varchar("state", { length: 20 }).notNull().default("running"),
+    attemptLabel: varchar("attempt_label", { length: 20 }).notNull(),
+    attemptCount: integer("attempt_count").notNull().default(1),
+    articleId: integer("article_id"),
+    selectedTopic: varchar("selected_topic", { length: 500 }),
+    evidenceUrls: jsonb("evidence_urls").$type<string[]>().notNull().default([]),
+    rsiDecision: varchar("rsi_decision", { length: 20 }),
+    imageKind: varchar("image_kind", { length: 20 }),
+    errorText: text("error_text"),
+    startedAt: ts("started_at").notNull().defaultNow(),
+    completedAt: ts("completed_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("weekly_feature_runs_state_idx").on(t.state),
+    index("weekly_feature_runs_updated_idx").on(t.updatedAt),
+  ],
+);
+
 /** 뉴스레터 구독자. 더블옵트인(confirmed_at) + 원클릭 해지(unsubscribe_token). */
 export const subscribers = pgTable("subscribers", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -246,6 +282,7 @@ export type Article = typeof articles.$inferSelect;
 export type NewArticle = typeof articles.$inferInsert;
 export type PageView = typeof pageViews.$inferInsert;
 export type CronRun = typeof cronRuns.$inferSelect;
+export type WeeklyFeatureRun = typeof weeklyFeatureRuns.$inferSelect;
 export type Subscriber = typeof subscribers.$inferSelect;
 export type Snippet = typeof snippets.$inferSelect;
 export type ScanReport = typeof scanReports.$inferSelect;

@@ -1,6 +1,7 @@
 // 주간 뉴스레터 발송 cron. 확인된 구독자에게 최신 주요 기사를 메일로 발송.
-// Vercel Cron(Authorization: Bearer CRON_SECRET) 또는 ?key=. RESEND_API_KEY 없으면 대기.
+// Vercel Cron(Authorization: Bearer CRON_SECRET). RESEND_API_KEY 없으면 대기.
 import { listConfirmedSubscribers } from "@/lib/admin-db";
+import { authorizeCronRequest } from "@/lib/cron-auth";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { getLatest } from "@/lib/articles";
 import { SITE } from "@/lib/site";
@@ -9,11 +10,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") || "";
-  const key = new URL(req.url).searchParams.get("key");
-  if (secret && auth !== `Bearer ${secret}` && key !== secret) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
+  const authorization = authorizeCronRequest(req);
+  if (!authorization.ok) {
+    return Response.json({ error: authorization.error }, { status: authorization.status });
   }
   if (!emailConfigured()) return Response.json({ skip: "RESEND_API_KEY 미설정" });
 
