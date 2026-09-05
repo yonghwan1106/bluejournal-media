@@ -342,6 +342,97 @@ test("선택 자료 제목에 공통인 가장 큰 고유 핵심어 조합만 �
   );
 });
 
+test("모델 검색어가 무효여도 선택 제목의 공통 고유어를 결정적으로 파생한다", () => {
+  const selectedTitles = [
+    "추미애, 포천~철원 고속도로 조기 추진 공동건의",
+    "경기도·강원도, 포천-철원 고속도로 예비타당성조사 대응",
+  ];
+  const forward = selectWeeklyFeatureArchiveTermsForTitles(
+    ["경기도", "사업"],
+    selectedTitles,
+  );
+  const reversed = selectWeeklyFeatureArchiveTermsForTitles(
+    ["사업", "경기도"],
+    [...selectedTitles].reverse(),
+  );
+
+  assert.equal(forward.length, 2);
+  assert.deepEqual(reversed, forward);
+  assert.equal(
+    selectedTitles.every((title) => matchesWeeklyFeatureIssueTitle(title, forward)),
+    true,
+  );
+
+  const duplicatedTitle = "포천 철원 고속도로 공동 대응";
+  assert.equal(
+    selectWeeklyFeatureArchiveTermsForTitles(
+      ["경기도", "사업"],
+      [duplicatedTitle, duplicatedTitle],
+    ).length,
+    2,
+    "서로 다른 공식 URL이 같은 제목을 써도 두 건으로 인정해야 한다",
+  );
+});
+
+test("상투적인 모집 문구만 겹치는 서로 다른 현안은 결정형 파생에서도 거부한다", () => {
+  const unrelatedTitles = [
+    "청년 대상 온라인 서비스 이용 신청 안내",
+    "노인 대상 온라인 서비스 이용 신청 안내",
+  ];
+  assert.deepEqual(selectWeeklyFeatureArchiveTermsForTitles(["온라인", "서비스"], unrelatedTitles), []);
+  assert.deepEqual(selectWeeklyFeatureArchiveTermsForTitles(["지원", "사업"], unrelatedTitles), []);
+  assert.deepEqual(
+    selectWeeklyFeatureArchiveTermsForTitles(
+      ["2026년", "지원사업"],
+      [
+        "수원시 2026년 청년 주거 지원사업 모집",
+        "용인시 2026년 청년 창업 지원사업 모집",
+      ],
+    ),
+    [],
+    "연도와 범용 사업 유형은 고유 현안 식별자가 아니다",
+  );
+
+  const unrelatedCandidates = unrelatedTitles.map((title, index) => ({
+    ...evidence[index],
+    title,
+  }));
+  assert.match(
+    validateTopicSelection(
+      {
+        headline: "서로 다른 온라인 서비스 두 건을 동일 현안으로 오인하지 않는다",
+        angle: "대상과 목적이 다른 공고가 상투적인 표현만 겹칠 때 자동 묶음을 차단한다.",
+        rationale: "온라인과 서비스 같은 일반적인 표현은 고유 사업이나 기관을 식별하지 못한다.",
+        sourceIds: unrelatedCandidates.map((candidate) => candidate.id),
+        archiveTerms: ["온라인", "서비스"],
+      },
+      unrelatedCandidates,
+      { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
+    ).join(" "),
+    /고유 사업·기관 식별자/,
+  );
+});
+
+test("핵심어가 선택 제목 전체에 흩어져 있으면 같은 현안 근거로 인정하지 않는다", () => {
+  const splitCandidates = [
+    { ...evidence[0], title: "포천 고속도로 추진계획" },
+    { ...evidence[1], title: "철원 접경지역 교통대책" },
+  ];
+  const errors = validateTopicSelection(
+    {
+      headline: "포천과 철원 접경 교통 현안을 함께 점검한다",
+      angle: "두 공식자료가 실제로 동일한 사업을 다루는지 제목 기준으로 엄격하게 검증한다.",
+      rationale: "모델이 고른 핵심어가 서로 다른 제목에 나뉘어 있을 때 오탐을 막기 위한 검사다.",
+      sourceIds: splitCandidates.map((source) => source.id),
+      archiveTerms: ["포천", "철원"],
+    },
+    splitCandidates,
+    { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
+  );
+
+  assert.match(errors.join(" "), /함께 나타나는 공식자료가 2개 미만/);
+});
+
 test("모든 핵심어가 각 제목에 있는 이번 주 자료만 seed로 인정한다", () => {
   const unrelated = {
     ...evidence[2],
@@ -409,6 +500,8 @@ test("주제 선정은 로컬 오류와 동일 현안 규칙으로 최대 두 �
   assert.match(weeklyFeatureAutomationSource, /직전 로컬 검증 오류\(문구 그대로\)/);
   assert.match(weeklyFeatureAutomationSource, /선택 자료 제목 각각에 모두 등장하는 비일반 핵심어 2~4개/);
   assert.match(weeklyFeatureAutomationSource, /후보 JSON\(모든 시도에서 동일\)/);
+  assert.match(weeklyFeatureAutomationSource, /previousTopic = topic/);
+  assert.doesNotMatch(weeklyFeatureAutomationSource, /previousTopic = normalizedTopic/);
 });
 
 test("기사 생성과 RSI 판정 프롬프트가 절차 상태·출처 매핑·판정 경계를 고정한다", () => {
