@@ -8,6 +8,7 @@ import {
   DEFAULT_WEEKLY_FEATURE_TEXT_FALLBACK_MODELS,
   DEFAULT_WEEKLY_FEATURE_TEXT_MODEL,
   MAX_WEEKLY_FEATURE_SOURCES,
+  MAX_WEEKLY_FEATURE_TOPIC_REVISION_CYCLES,
   MIN_WEEKLY_FEATURE_CURRENT_SOURCES,
   MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES,
   WEEKLY_FEATURE_INVOCATION_BUDGET_MS,
@@ -396,6 +397,18 @@ test("생성 섹션을 편집 규격 순서로 고정하고 RSI 수정은 최대
     "정렬이 중복 역할이나 누락 역할을 정상 구조로 위장하면 안 된다",
   );
   assert.equal(MAX_WEEKLY_FEATURE_RSI_REVISION_CYCLES, 2);
+});
+
+test("주제 선정은 로컬 오류와 동일 현안 규칙으로 최대 두 번만 재선정한다", () => {
+  assert.equal(MAX_WEEKLY_FEATURE_TOPIC_REVISION_CYCLES, 2);
+  assert.match(
+    weeklyFeatureAutomationSource,
+    /correctionCycle <= MAX_WEEKLY_FEATURE_TOPIC_REVISION_CYCLES/,
+  );
+  assert.match(weeklyFeatureAutomationSource, /직전 정규화 주제 JSON/);
+  assert.match(weeklyFeatureAutomationSource, /직전 로컬 검증 오류\(문구 그대로\)/);
+  assert.match(weeklyFeatureAutomationSource, /선택 자료 제목 각각에 모두 등장하는 비일반 핵심어 2~4개/);
+  assert.match(weeklyFeatureAutomationSource, /후보 JSON\(모든 시도에서 동일\)/);
 });
 
 test("기사 생성과 RSI 판정 프롬프트가 절차 상태·출처 매핑·판정 경계를 고정한다", () => {
