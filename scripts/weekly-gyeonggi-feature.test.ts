@@ -28,6 +28,7 @@ import {
   remainingWeeklyFeatureInvocationMs,
   resolveWeeklyFeatureGatewayFallbackModels,
   sanitizeWeeklyFeatureArchiveTerms,
+  selectWeeklyFeatureArchiveTermsForTitles,
   selectWeeklyFeatureCurrentCandidates,
   selectWeeklyFeatureSupplementalCandidates,
   shouldSearchWeeklyFeaturePimac,
@@ -299,6 +300,44 @@ test("이번 주 주제 seed는 직접 관련 2건부터 허용하되 최종 3�
       { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
     ).join(" "),
     /자료 제목/,
+  );
+});
+
+test("선택 자료 제목에 공통인 가장 큰 고유 핵심어 조합만 결정적으로 남긴다", () => {
+  const selectedTitles = [
+    "포천-철원 고속도로 예비타당성조사 대응",
+    "포천·철원 고속도로 조기 추진 공동건의",
+  ];
+  assert.deepEqual(
+    selectWeeklyFeatureArchiveTermsForTitles(
+      ["포천", "철원", "접경지역"],
+      selectedTitles,
+    ),
+    ["포천", "철원"],
+  );
+
+  const splitEvidence: WeeklyFeatureEvidence[] = [
+    { ...evidence[0], title: "포천 고속도로 추진계획" },
+    { ...evidence[1], title: "철원 접경지역 교통대책" },
+  ];
+  const noCommonTerms = selectWeeklyFeatureArchiveTermsForTitles(
+    ["포천", "철원", "고속도로", "접경지역"],
+    splitEvidence.map((source) => source.title),
+  );
+  assert.deepEqual(noCommonTerms, []);
+  assert.match(
+    validateTopicSelection(
+      {
+        headline: "포천과 철원 접경 교통 현안을 함께 살핀다",
+        angle: "서로 다른 공식자료가 실제로 같은 사업을 다루는지 엄격하게 검증한다.",
+        rationale: "두 자료 제목에 공통으로 나타나는 특정 고유어 조합이 있는지 확인한다.",
+        sourceIds: splitEvidence.map((source) => source.id),
+        archiveTerms: noCommonTerms,
+      },
+      splitEvidence,
+      { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
+    ).join(" "),
+    /2~4개/,
   );
 });
 

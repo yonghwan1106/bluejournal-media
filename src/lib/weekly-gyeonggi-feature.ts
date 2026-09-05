@@ -30,6 +30,7 @@ import {
   mergeWeeklyFeatureEvidence,
   resolveWeeklyFeatureGatewayFallbackModels,
   sanitizeWeeklyFeatureArchiveTerms,
+  selectWeeklyFeatureArchiveTermsForTitles,
   selectWeeklyFeatureCurrentCandidates,
   selectWeeklyFeatureSupplementalCandidates,
   shouldSearchWeeklyFeaturePimac,
@@ -577,7 +578,15 @@ async function selectTopic(
       timeoutMs: TEXT_TIMEOUT_MS,
     }),
   });
-  const topic = normalizeTopic(result.output);
+  const normalizedTopic = normalizeTopic(result.output);
+  const selectedIds = new Set(normalizedTopic.sourceIds);
+  const topic = {
+    ...normalizedTopic,
+    archiveTerms: selectWeeklyFeatureArchiveTermsForTitles(
+      normalizedTopic.archiveTerms,
+      candidates.filter((candidate) => selectedIds.has(candidate.id)).map((candidate) => candidate.title),
+    ),
+  };
   const errors = validateTopicSelection(topic, candidates, {
     minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES,
   });

@@ -283,6 +283,46 @@ export function sanitizeWeeklyFeatureArchiveTerms(values: readonly string[]): st
   return sanitized;
 }
 
+function weeklyFeatureArchiveTermCombinations(values: string[], size: number): string[][] {
+  const combinations: string[][] = [];
+
+  function collect(start: number, current: string[]): void {
+    if (current.length === size) {
+      combinations.push([...current]);
+      return;
+    }
+
+    const remaining = size - current.length;
+    for (let index = start; index <= values.length - remaining; index += 1) {
+      current.push(values[index]);
+      collect(index + 1, current);
+      current.pop();
+    }
+  }
+
+  collect(0, []);
+  return combinations;
+}
+
+/** 선택 자료 중 최소 두 제목에 함께 나타나는 가장 큰 핵심어 조합을 고정 순서로 고른다. */
+export function selectWeeklyFeatureArchiveTermsForTitles(
+  values: readonly string[],
+  selectedTitles: readonly string[],
+): string[] {
+  const sanitized = sanitizeWeeklyFeatureArchiveTerms(values);
+
+  for (let size = sanitized.length; size >= 2; size -= 1) {
+    for (const combination of weeklyFeatureArchiveTermCombinations(sanitized, size)) {
+      const matchingTitleCount = selectedTitles.filter((title) =>
+        matchesWeeklyFeatureIssueTitle(title, combination),
+      ).length;
+      if (matchingTitleCount >= MIN_WEEKLY_FEATURE_CURRENT_SOURCES) return combination;
+    }
+  }
+
+  return [];
+}
+
 /** 모든 핵심어가 제목에 직접 나타날 때만 같은 현안의 보강 자료로 인정한다. */
 export function matchesWeeklyFeatureIssueTitle(title: string, archiveTerms: string[]): boolean {
   const normalizedTitle = normalizeWeeklyFeatureIssueText(title);
