@@ -10,6 +10,7 @@
     "test:weekly-feature": "tsx --test scripts/weekly-gyeonggi-feature.test.ts"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "4.0.75",
     "@aws-sdk/client-s3": "^3.1069.0",
     "@neondatabase/serverless": "^1.1.0",
     "@tiptap/extension-image": "^3.27.0",
