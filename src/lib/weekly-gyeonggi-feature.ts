@@ -29,6 +29,7 @@ import {
   isBeforeWeeklyFeaturePublishDeadline,
   mergeWeeklyFeatureEvidence,
   resolveWeeklyFeatureGatewayFallbackModels,
+  sanitizeWeeklyFeatureArchiveTerms,
   selectWeeklyFeatureCurrentCandidates,
   selectWeeklyFeatureSupplementalCandidates,
   shouldSearchWeeklyFeaturePimac,
@@ -520,7 +521,9 @@ function normalizeTopic(topic: WeeklyFeatureTopic): WeeklyFeatureTopic {
     angle: inlineText(topic.angle),
     rationale: inlineText(topic.rationale),
     sourceIds: cleanIds(Array.isArray(topic.sourceIds) ? topic.sourceIds : []),
-    archiveTerms: cleanIds(Array.isArray(topic.archiveTerms) ? topic.archiveTerms : []).slice(0, 4),
+    archiveTerms: sanitizeWeeklyFeatureArchiveTerms(
+      Array.isArray(topic.archiveTerms) ? topic.archiveTerms : [],
+    ),
   };
 }
 

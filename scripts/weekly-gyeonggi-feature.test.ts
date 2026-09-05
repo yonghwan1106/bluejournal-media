@@ -27,6 +27,7 @@ import {
   normalizeWeeklyFeatureIssueText,
   remainingWeeklyFeatureInvocationMs,
   resolveWeeklyFeatureGatewayFallbackModels,
+  sanitizeWeeklyFeatureArchiveTerms,
   selectWeeklyFeatureCurrentCandidates,
   selectWeeklyFeatureSupplementalCandidates,
   shouldSearchWeeklyFeaturePimac,
@@ -270,13 +271,26 @@ test("이번 주 주제 seed는 직접 관련 2건부터 허용하되 최종 3�
     [],
   );
   assert.match(validateTopicSelection(seedTopic, evidence).join(" "), /3개 미만/);
+  const mixedTerms = sanitizeWeeklyFeatureArchiveTerms(["포천", "철원", "사업"]);
+  assert.deepEqual(mixedTerms, ["포천", "철원"]);
+  assert.deepEqual(
+    validateTopicSelection(
+      { ...seedTopic, archiveTerms: mixedTerms },
+      evidence,
+      { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
+    ),
+    [],
+  );
+
+  const genericOnlyTerms = sanitizeWeeklyFeatureArchiveTerms(["경기도", "사업"]);
+  assert.deepEqual(genericOnlyTerms, []);
   assert.match(
     validateTopicSelection(
-      { ...seedTopic, archiveTerms: ["경기도", "사업"] },
+      { ...seedTopic, archiveTerms: genericOnlyTerms },
       evidence,
       { minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES },
     ).join(" "),
-    /일반어/,
+    /2~4개/,
   );
   assert.match(
     validateTopicSelection(
