@@ -1,16 +1,15 @@
 // 주간 운영 다이제스트 cron. 발행인 이메일로 7일 요약 발송. RESEND_API_KEY 없으면 대기.
 import { weeklyDigest, topRecentPublished, listOpenScans } from "@/lib/admin-db";
+import { authorizeCronRequest } from "@/lib/cron-auth";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") || "";
-  const key = new URL(req.url).searchParams.get("key");
-  if (secret && auth !== `Bearer ${secret}` && key !== secret) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
+  const authorization = authorizeCronRequest(req);
+  if (!authorization.ok) {
+    return Response.json({ error: authorization.error }, { status: authorization.status });
   }
   if (!emailConfigured()) return Response.json({ skip: "RESEND_API_KEY 미설정" });
 

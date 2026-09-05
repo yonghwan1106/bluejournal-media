@@ -29,6 +29,13 @@
       "when": 1781698682662,
       "tag": "0003_slim_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788600365273,
+      "tag": "0004_weekly_feature_runs",
+      "breakpoints": true
     }
   ]
 }

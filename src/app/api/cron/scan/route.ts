@@ -1,9 +1,10 @@
 // 품질 스캔 cron: 발행 기사 본문/대표의 R2 이미지를 HEAD 점검 → 깨진 이미지를 scan_reports 에 기록.
-// 주간 실행. Vercel Cron(Authorization: Bearer CRON_SECRET) 또는 ?key=.
+// 주간 실행. Vercel Cron이 Authorization: Bearer CRON_SECRET으로 호출한다.
 import { getDb } from "@/db";
 import { articles } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { replaceOpenScans } from "@/lib/admin-db";
+import { authorizeCronRequest } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,11 +19,9 @@ async function headOk(url: string): Promise<boolean> {
 }
 
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") || "";
-  const key = new URL(req.url).searchParams.get("key");
-  if (secret && auth !== `Bearer ${secret}` && key !== secret) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
+  const authorization = authorizeCronRequest(req);
+  if (!authorization.ok) {
+    return Response.json({ error: authorization.error }, { status: authorization.status });
   }
 
   const db = getDb();

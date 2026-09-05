@@ -24,6 +24,14 @@
     {
       "path": "/api/cron/digest",
       "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/cron/weekly-gyeonggi-feature/prepare",
+      "schedule": "0 22 * * 5"
+    },
+    {
+      "path": "/api/cron/weekly-gyeonggi-feature/retry",
+      "schedule": "0 23 * * 5"
     }
   ]
 }

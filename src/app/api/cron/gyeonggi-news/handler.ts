@@ -1,20 +1,16 @@
 import { revalidatePath } from "next/cache";
 import { runDailyGyeonggiNews } from "@/lib/daily-gyeonggi-news";
+import { authorizeCronRequest } from "@/lib/cron-auth";
 
 type GyeonggiNewsCronConfig = {
   runLabel: "primary" | "followup";
   publishedAtTime: string;
 };
 
-function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function handleGyeonggiNewsCron(req: Request, config: GyeonggiNewsCronConfig) {
-  if (!authorized(req)) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
+  const authorization = authorizeCronRequest(req);
+  if (!authorization.ok) {
+    return Response.json({ error: authorization.error }, { status: authorization.status });
   }
 
   const url = new URL(req.url);
