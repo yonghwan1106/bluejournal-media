@@ -578,9 +578,14 @@ test("AI Gateway 텍스트·RSI 라우팅은 공급자 다변화 폴백과 설�
     weeklyFeatureAutomationSource.match(
       /providerOptions:\s*\{\s*gateway:\s*routing\.gatewayOptions\s*\}/g,
     )?.length,
-    4,
-    "네 번의 텍스트 생성 호출 모두 Gateway 모델 폴백을 사용해야 한다",
+    3,
+    "주제·기사·수정 생성 호출은 Gateway 모델 폴백을 사용해야 한다",
   );
+  assert.match(weeklyFeatureAutomationSource, /gateway:\s*gatewayOptions/);
+  assert.match(weeklyFeatureAutomationSource, /NoObjectGeneratedError\.isInstance\(error\)/);
+  assert.match(weeklyFeatureAutomationSource, /thinkingBudget:\s*RSI_GOOGLE_THINKING_BUDGET/);
+  assert.match(weeklyFeatureAutomationSource, /maxOutputTokens:\s*RSI_MAX_OUTPUT_TOKENS/);
+  assert.match(weeklyFeatureAutomationSource, /RSI_STRUCTURED_OUTPUT_ATTEMPTS/);
 });
 
 test("도청 s017과 시군 s003 목록은 서로 다른 실제 경로와 행 selector로 파싱한다", () => {
