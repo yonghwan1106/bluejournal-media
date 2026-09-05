@@ -653,7 +653,7 @@ async function selectTopic(
       minimumSources: MIN_WEEKLY_FEATURE_CURRENT_SOURCES,
     });
     if (validationErrors.length === 0) return topic;
-    previousTopic = normalizedTopic;
+    previousTopic = topic;
   }
 
   throw new EditorialHoldError(`주제 선정 검증 실패: ${validationErrors.join(" ")}`);

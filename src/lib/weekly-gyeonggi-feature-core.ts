@@ -226,25 +226,51 @@ const GENERIC_WEEKLY_FEATURE_ARCHIVE_TERMS = new Set([
   "개선",
   "계획",
   "공동",
+  "공모",
   "대책",
+  "대상",
   "도민",
   "발표",
   "보도자료",
   "사업",
+  "선정",
+  "신청",
+  "실시",
+  "시작",
   "시민",
+  "안내",
+  "업무협약",
   "운영",
   "예정",
   "예타",
+  "접수",
   "정책",
+  "제공",
   "주민",
   "지원",
   "지역",
+  "참여",
+  "체결",
   "추진",
   "통과",
   "촉구",
+  "프로그램",
+  "행사",
   "현안",
+  "협약",
+  "홍보",
   "확대",
   "확정",
+  "활성화",
+  "개최",
+  "교육",
+  "강화",
+  "마련",
+  "모집",
+  "본격",
+  "예방",
+  "점검",
+  "조성",
 ]);
 
 /** 검색 결과의 구두점 차이를 없애 동일 사업명 여부를 보수적으로 비교한다. */
@@ -305,6 +331,241 @@ function weeklyFeatureArchiveTermCombinations(values: string[], size: number): s
   return combinations;
 }
 
+function compareWeeklyFeatureText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+const WEEKLY_FEATURE_PLACE_STEMS = new Set([
+  "가평",
+  "강원",
+  "경기",
+  "고양",
+  "과천",
+  "광명",
+  "광주",
+  "구리",
+  "군포",
+  "김포",
+  "남양주",
+  "동두천",
+  "부천",
+  "서울",
+  "성남",
+  "수원",
+  "시흥",
+  "안산",
+  "안성",
+  "안양",
+  "양주",
+  "양평",
+  "여주",
+  "연천",
+  "오산",
+  "용인",
+  "의왕",
+  "의정부",
+  "이천",
+  "인천",
+  "철원",
+  "파주",
+  "평택",
+  "포천",
+  "하남",
+  "화성",
+]);
+
+function isWeeklyFeaturePlaceTerm(term: string): boolean {
+  const normalized = normalizeWeeklyFeatureIssueText(term);
+  const stem = normalized.replace(/(?:특별자치)?[시군구도]$/u, "");
+  return WEEKLY_FEATURE_PLACE_STEMS.has(normalized) || WEEKLY_FEATURE_PLACE_STEMS.has(stem);
+}
+
+const WEEKLY_FEATURE_ISSUE_QUALIFIERS = new Set([
+  "근로자",
+  "노동자",
+  "노인",
+  "농민",
+  "다문화",
+  "소상공인",
+  "신혼부부",
+  "아동",
+  "어르신",
+  "여성",
+  "영유아",
+  "예술인",
+  "자영업자",
+  "장애인",
+  "청년",
+  "청소년",
+  "학생",
+]);
+
+const WEEKLY_FEATURE_STRONG_EXACT_TERMS = new Set([
+  "고속도로",
+  "공항",
+  "교량",
+  "기본소득",
+  "기회소득",
+  "전철",
+  "지하철",
+  "철도",
+  "터널",
+  "항만",
+]);
+
+const WEEKLY_FEATURE_STRONG_COMPOUND_SUFFIXES = [
+  "고속도로",
+  "교육청",
+  "기본소득",
+  "기회소득",
+  "데이터센터",
+  "대학교",
+  "산업단지",
+  "시범사업",
+  "지원사업",
+  "프로젝트",
+  "플랫폼",
+  "바우처",
+  "시스템",
+  "신도시",
+  "연구원",
+  "의료원",
+  "지하철",
+  "공항",
+  "교량",
+  "노선",
+  "돌봄",
+  "병원",
+  "산단",
+  "위성",
+  "전철",
+  "철도",
+  "터널",
+  "특구",
+  "패스",
+  "항만",
+  "공단",
+  "공사",
+  "군청",
+  "구청",
+  "대학",
+  "도청",
+  "반도체",
+  "시청",
+  "재단",
+] as const;
+
+function isStrongWeeklyFeatureIssueTerm(term: string): boolean {
+  const normalized = normalizeWeeklyFeatureIssueText(term);
+  if (/^(?:gtx(?: [a-z])?|re100|srt)$/u.test(normalized)) return true;
+  if (WEEKLY_FEATURE_STRONG_EXACT_TERMS.has(normalized)) return true;
+  return WEEKLY_FEATURE_STRONG_COMPOUND_SUFFIXES.some(
+    (suffix) => normalized.endsWith(suffix) && normalized.length >= suffix.length + 2,
+  );
+}
+
+function hasWeeklyFeatureIssueIdentity(terms: readonly string[]): boolean {
+  const normalizedTerms = [...new Set(terms.map(normalizeWeeklyFeatureIssueText).filter(Boolean))];
+  if (normalizedTerms.length < 2) return false;
+  const strongCount = normalizedTerms.filter(isStrongWeeklyFeatureIssueTerm).length;
+  const placeCount = normalizedTerms.filter(isWeeklyFeaturePlaceTerm).length;
+  const qualifierCount = normalizedTerms.filter((term) =>
+    WEEKLY_FEATURE_ISSUE_QUALIFIERS.has(term),
+  ).length;
+  return (
+    placeCount >= 2 ||
+    (strongCount >= 1 && (strongCount >= 2 || placeCount >= 1 || qualifierCount >= 1))
+  );
+}
+
+function deriveWeeklyFeatureArchiveTermsFromTitles(
+  selectedTitles: readonly string[],
+): string[] {
+  // 서로 다른 공식 URL이 같은 제목을 쓸 수 있으므로 제목 문자열 자체는 중복 제거하지 않는다.
+  const normalizedTitles = selectedTitles
+    .map(normalizeWeeklyFeatureIssueText)
+    .filter(Boolean)
+    .sort(compareWeeklyFeatureText);
+  if (normalizedTitles.length < MIN_WEEKLY_FEATURE_CURRENT_SOURCES) return [];
+
+  const titleTokens = normalizedTitles.map((title) =>
+    [
+      ...new Set(
+        title
+          .split(" ")
+          .filter(
+            (term) =>
+              term.length >= 2 &&
+              term.length <= 30 &&
+              !/^\d+$/.test(term) &&
+              !isGenericWeeklyFeatureArchiveTerm(term),
+          ),
+      ),
+    ].sort(compareWeeklyFeatureText),
+  );
+  const documentFrequency = new Map<string, number>();
+  for (const tokens of titleTokens) {
+    for (const token of tokens) {
+      documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
+    }
+  }
+
+  const candidates: Array<{
+    terms: string[];
+    matchingTitleCount: number;
+    combinedLength: number;
+  }> = [];
+  for (let leftIndex = 0; leftIndex < normalizedTitles.length - 1; leftIndex += 1) {
+    const rightStart = leftIndex + 1;
+    for (let rightIndex = rightStart; rightIndex < normalizedTitles.length; rightIndex += 1) {
+      const rightTokens = new Set(titleTokens[rightIndex]);
+      const commonTerms = titleTokens[leftIndex]
+        .filter((term) => rightTokens.has(term))
+        .sort((left, right) => {
+          const frequencyDifference =
+            (documentFrequency.get(left) ?? 0) - (documentFrequency.get(right) ?? 0);
+          if (frequencyDifference !== 0) return frequencyDifference;
+          const lengthDifference = right.length - left.length;
+          if (lengthDifference !== 0) return lengthDifference;
+          return compareWeeklyFeatureText(left, right);
+        });
+      if (commonTerms.length < 2) continue;
+
+      // 두 개의 희소한 공통어만 사용해 같은 현안 식별력과 과거 자료 검색 재현율을 함께 지킨다.
+      const strongTerm = commonTerms.find(isStrongWeeklyFeatureIssueTerm);
+      const placeTerms = commonTerms.filter(isWeeklyFeaturePlaceTerm);
+      const strongPartner = strongTerm
+        ? commonTerms.find(
+            (term) =>
+              term !== strongTerm &&
+              (isStrongWeeklyFeatureIssueTerm(term) ||
+                isWeeklyFeaturePlaceTerm(term) ||
+                WEEKLY_FEATURE_ISSUE_QUALIFIERS.has(term)),
+          )
+        : undefined;
+      const terms = strongTerm && strongPartner ? [strongTerm, strongPartner] : placeTerms.slice(0, 2);
+      if (!hasWeeklyFeatureIssueIdentity(terms)) continue;
+      const matchingTitleCount = normalizedTitles.filter((title) =>
+        terms.every((term) => title.includes(term)),
+      ).length;
+      candidates.push({
+        terms,
+        matchingTitleCount,
+        combinedLength: terms.reduce((length, term) => length + term.length, 0),
+      });
+    }
+  }
+
+  candidates.sort((left, right) => {
+    const countDifference = right.matchingTitleCount - left.matchingTitleCount;
+    if (countDifference !== 0) return countDifference;
+    const lengthDifference = right.combinedLength - left.combinedLength;
+    if (lengthDifference !== 0) return lengthDifference;
+    return compareWeeklyFeatureText(left.terms.join("\u0000"), right.terms.join("\u0000"));
+  });
+  return candidates[0]?.terms ?? [];
+}
+
 /** 선택 자료 중 최소 두 제목에 함께 나타나는 가장 큰 핵심어 조합을 고정 순서로 고른다. */
 export function selectWeeklyFeatureArchiveTermsForTitles(
   values: readonly string[],
@@ -317,11 +578,16 @@ export function selectWeeklyFeatureArchiveTermsForTitles(
       const matchingTitleCount = selectedTitles.filter((title) =>
         matchesWeeklyFeatureIssueTitle(title, combination),
       ).length;
-      if (matchingTitleCount >= MIN_WEEKLY_FEATURE_CURRENT_SOURCES) return combination;
+      if (
+        matchingTitleCount >= MIN_WEEKLY_FEATURE_CURRENT_SOURCES &&
+        hasWeeklyFeatureIssueIdentity(combination)
+      ) {
+        return combination;
+      }
     }
   }
 
-  return [];
+  return deriveWeeklyFeatureArchiveTermsFromTitles(selectedTitles);
 }
 
 /** 모든 핵심어가 제목에 직접 나타날 때만 같은 현안의 보강 자료로 인정한다. */
@@ -572,9 +838,25 @@ export function validateTopicSelection(
   if (archiveTerms.some((term) => isGenericWeeklyFeatureArchiveTerm(term))) {
     errors.push("과거 공식자료 검색 핵심어에 일반어만 사용할 수 없습니다.");
   }
+  if (archiveTerms.length >= 2 && !hasWeeklyFeatureIssueIdentity(archiveTerms)) {
+    errors.push("검색 핵심어에는 고유 사업·기관 식별자 또는 서로 다른 두 행정지명이 필요합니다.");
+  }
   const normalizedSelectedTitles = normalizeWeeklyFeatureIssueText(selectedTitles);
   if (archiveTerms.some((term) => !normalizedSelectedTitles.includes(term))) {
     errors.push("과거 공식자료 검색 핵심어는 선택한 이번 주 자료 제목에서 확인돼야 합니다.");
+  }
+  if (
+    archiveTerms.length >= 2 &&
+    archiveTerms.length <= 4 &&
+    candidates.filter(
+      (candidate) =>
+        selectedIds.includes(candidate.id) &&
+        matchesWeeklyFeatureIssueTitle(candidate.title, archiveTerms),
+    ).length < minimumSources
+  ) {
+    errors.push(
+      `모든 검색 핵심어가 함께 나타나는 공식자료가 ${minimumSources}개 미만입니다.`,
+    );
   }
 
   return errors;
