@@ -148,7 +148,6 @@ const MAJOR_NEWS_SLOT = "주요뉴스";
 
 function isActiveMajorNewsSlot(slot: string | null, now = new Date()): boolean {
   if (!slot) return false;
-  if (slot === MAJOR_NEWS_SLOT) return true;
 
   const expires = slot.match(/^주요뉴스:(\d{4}-\d{2}-\d{2})$/)?.[1];
   if (!expires) return false;
@@ -276,7 +275,7 @@ export const getMajorNewsPins = cache(
             .where(
               and(
                 and(eq(articles.status, "published"), isNull(articles.deletedAt)),
-                dsql`${articles.displaySlot} like ${`${MAJOR_NEWS_SLOT}%`}`,
+                dsql`${articles.displaySlot} like ${`${MAJOR_NEWS_SLOT}:%`}`,
               ),
             )
             .orderBy(pubOrder)
