@@ -144,6 +144,18 @@ function jsonSorted(): SeedArticle[] {
 }
 const isPub = (a: SeedArticle) => a.status === "published";
 const jsonPub = () => jsonSorted().filter(isPub);
+const MAJOR_NEWS_SLOT = "주요뉴스";
+
+function isActiveMajorNewsSlot(slot: string | null, now = new Date()): boolean {
+  if (!slot) return false;
+  if (slot === MAJOR_NEWS_SLOT) return true;
+
+  const expires = slot.match(/^주요뉴스:(\d{4}-\d{2}-\d{2})$/)?.[1];
+  if (!expires) return false;
+
+  const expiresAt = new Date(`${expires}T23:59:59.999+09:00`);
+  return Number.isFinite(expiresAt.getTime()) && expiresAt >= now;
+}
 
 // 관련기사 매칭(양 경로 동일): 지역 일치(지역이 있을 때) 또는 태그 겹침
 function relatedMatch(x: SeedArticle, a: SeedArticle): boolean {
@@ -249,6 +261,34 @@ export const getHeroArticles = cache(
             (a) => a.displaySlot === "헤드라인" || a.section === "특집",
           )
           .slice(0, 5),
+    ),
+);
+
+/** 주요뉴스 고정 슬롯. `주요뉴스:YYYY-MM-DD`는 해당 KST 날짜 끝까지만 노출한다. */
+export const getMajorNewsPins = cache(
+  async (n = 4): Promise<SeedArticle[]> =>
+    viaDb(
+      async () =>
+        (
+          await getDb()
+            .select(CARD_COLS)
+            .from(articles)
+            .where(
+              and(
+                and(eq(articles.status, "published"), isNull(articles.deletedAt)),
+                dsql`${articles.displaySlot} like ${`${MAJOR_NEWS_SLOT}%`}`,
+              ),
+            )
+            .orderBy(pubOrder)
+            .limit(n * 3)
+        )
+          .map(fromCard)
+          .filter((a) => isActiveMajorNewsSlot(a.displaySlot))
+          .slice(0, n),
+      () =>
+        jsonPub()
+          .filter((a) => isActiveMajorNewsSlot(a.displaySlot))
+          .slice(0, n),
     ),
 );
 
