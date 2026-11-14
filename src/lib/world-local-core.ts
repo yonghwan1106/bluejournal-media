@@ -47,6 +47,8 @@ export function worldDraftErrors(d: WorldDraft, sources: WorldSource[]): string[
   if (new Set(sources.filter(s => cited.has(s.id)).map(s => s.url)).size < 2) errors.push("서로 다른 공식 출처 2개");
   if (d.sections.some(s => !s.sourceIds.length || !s.paragraphs.length) ||
     [...cited].some(id => !ids.has(id))) errors.push("문단별 유효한 출처");
+  const paragraphs=[d.lead,...d.sections.flatMap(s=>s.paragraphs),d.conclusion];
+  if(paragraphs.some(p=>!/[.!?。！？]$/.test(p.replace(/\s*\(?S\d+(?:\s*[,·]\s*S\d+)*\)?\s*$/g,"").trim())))errors.push("문단은 완결된 문장으로 끝나야 함");
   if (!d.city.trim() || !d.mechanism.trim()) errors.push("도시와 제도 식별");
   return errors;
 }
@@ -63,7 +65,7 @@ export function worldBodyHtml(d: WorldDraft, sources: WorldSource[], now: Date):
         '" rel="noopener noreferrer">' + escape(source.title) + "</a>";
     }).join(" · ") + "</p>").join("") + p(d.conclusion) +
     p("공식자료 확인: " + now.toISOString().slice(0,10) +
-      ". AI를 활용해 작성하고 별도 모델로 근거를 대조했습니다. 대표 이미지는 편집용 도안입니다.");
+      ". AI를 활용해 작성하고 독립된 검수 단계에서 근거를 대조했습니다. 대표 이미지는 편집용 도안입니다.");
 }
 export function normalizedWorldUrl(url: string): string {
   try { return officialWorldUrl(url).href.replace(/\/$/, ""); } catch { return url; }

@@ -16,9 +16,9 @@ test("official domains reject credentials, ports and spoofed suffixes",()=>{
 });
 const sources:WorldSource[]=[{id:"S1",url:"https://hel.fi/a",title:"공식자료 A",text:"근거",fetchedAt:"2026-11-14"},
  {id:"S2",url:"https://hel.fi/b",title:"공식자료 B",text:"근거",fetchedAt:"2026-11-14"}];
-const draft:WorldDraft={title:"헬싱키는 어떻게 주민의 선택을 반영하는가",subtitle:"제도의 구조",lead:"본문".repeat(300),
- city:"헬싱키",mechanism:"주민참여",sections:[0,1,2,3].map(i=>({heading:"분석",paragraphs:["내용".repeat(150)],sourceIds:[i%2?"S1":"S2"]})),
- conclusion:"확인 과제",tags:[]};
+const draft:WorldDraft={title:"헬싱키는 어떻게 주민의 선택을 반영하는가",subtitle:"제도의 구조",lead:"본문".repeat(300)+".",
+ city:"헬싱키",mechanism:"주민참여",sections:[0,1,2,3].map(i=>({heading:"분석",paragraphs:["내용".repeat(150)+"."],sourceIds:[i%2?"S1":"S2"]})),
+ conclusion:"확인 과제.",tags:[]};
 test("invalid or insufficient citations fail closed",()=>{
  assert.deepEqual(worldDraftErrors(draft,sources),[]);
  assert.ok(worldDraftErrors({...draft,sections:draft.sections.map(s=>({...s,sourceIds:["fake"]}))},sources).length);
@@ -40,3 +40,5 @@ test("different headlines can proceed to independent original-text verification"
  assert.ok(validateTopicEvidence({...proof,sources:proof.sources.map(e=>({...e,quote:"원문에 존재하지 않는 허위 문장이다."}))},evidence).length);
  assert.ok(validateTopicEvidence(proof,[evidence[0],{...evidence[1],url:evidence[0].url},evidence[2]]).length);
 });
+
+test("unfinished paragraphs cannot pass editorial validation",()=>{assert.ok(worldDraftErrors({...draft,conclusion:"결론이 중간에서 끝나면"},sources).some(e=>e.includes("완결")));});
