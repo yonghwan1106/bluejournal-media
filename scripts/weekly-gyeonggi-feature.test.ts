@@ -575,7 +575,7 @@ test("주제 선정은 로컬 오류와 동일 현안 규칙으로 최대 두 �
   );
   assert.match(weeklyFeatureAutomationSource, /직전 정규화 주제 JSON/);
   assert.match(weeklyFeatureAutomationSource, /직전 로컬 검증 오류\(문구 그대로\)/);
-  assert.match(weeklyFeatureAutomationSource, /선택 자료 제목 각각에 모두 등장하는 비일반 핵심어 2~4개/);
+  assert.match(weeklyFeatureAutomationSource, /제목의 단어가 일치할 필요는 없으며 실제 원문에서 동일 현안인지 별도로 대조/);
   assert.match(weeklyFeatureAutomationSource, /후보 JSON\(모든 시도에서 동일\)/);
   assert.match(weeklyFeatureAutomationSource, /previousTopic = topic/);
   assert.doesNotMatch(weeklyFeatureAutomationSource, /previousTopic = normalizedTopic/);

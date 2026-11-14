@@ -671,6 +671,7 @@ export function selectWeeklyFeatureSupplementalCandidates(params: {
   archiveTerms: string[];
   weekStart: string;
   maximum: number;
+  allowPartialTitleMatch?: boolean;
 }): WeeklyFeatureCandidate[] {
   const currentIds = new Set(params.currentEvidence.map((source) => source.id));
   const currentUrls = new Set(params.currentEvidence.map((source) => source.url));
@@ -681,7 +682,9 @@ export function selectWeeklyFeatureSupplementalCandidates(params: {
       candidate.date >= params.weekStart ||
       currentIds.has(candidate.id) ||
       currentUrls.has(candidate.url) ||
-      !matchesWeeklyFeatureIssueTitle(candidate.title, params.archiveTerms)
+      !(params.allowPartialTitleMatch
+        ? params.archiveTerms.some(term => !isGenericWeeklyFeatureArchiveTerm(term) && normalizeWeeklyFeatureIssueText(candidate.title).includes(normalizeWeeklyFeatureIssueText(term)))
+        : matchesWeeklyFeatureIssueTitle(candidate.title, params.archiveTerms))
     ) {
       continue;
     }
@@ -1124,4 +1127,31 @@ export function buildWeeklyFeatureFallbackSvg(title: string, weekStart: string):
   <text x="164" y="828" fill="#dcecf7" font-family="Arial, 'Malgun Gothic', sans-serif" font-size="28">공식자료 기반 분석 · ${safeWeek}</text>
   <text x="164" y="882" fill="#dcecf7" font-family="Arial, 'Malgun Gothic', sans-serif" font-size="24">경인블루저널 자체 제작 자료 이미지</text>
 </svg>`;
+}
+
+/** 제목의 동일 단어 여부 대신 원문 대조 단계로 넘길 후보의 형태만 검증한다. */
+export function validateTopicForEvidence(topic: WeeklyFeatureTopic, candidates: WeeklyFeatureCandidate[]): string[] {
+  const ids=new Set(topic.sourceIds);
+  const selected=candidates.filter(c=>ids.has(c.id));
+  const errors:string[]=[];
+  if(topic.headline.trim().length<10 || topic.angle.trim().length<20)errors.push("취재 관점 부족");
+  if(selected.length!==ids.size)errors.push("알 수 없는 출처 ID");
+  if(new Set(selected.map(c=>c.url)).size<MIN_WEEKLY_FEATURE_CURRENT_SOURCES)errors.push("이번 주 서로 다른 원문 2개 미만");
+  if(topic.archiveTerms.length<2 || topic.archiveTerms.length>4)errors.push("구체적 검색어 2~4개 필요");
+  if(topic.archiveTerms.some(t=>isGenericWeeklyFeatureArchiveTerm(t)))errors.push("일반어 검색어 금지");
+  return errors;
+}
+export type TopicEvidenceCheck = { sameIssue: boolean; reason: string; sources: { id: string; quote: string }[] };
+export function validateTopicEvidence(check:TopicEvidenceCheck,evidence:WeeklyFeatureEvidence[]):string[]{
+  const errors:string[]=[];
+  if(!check.sameIssue)errors.push("동일 사건·사업·정책을 다루지 않음");
+  if(new Set(evidence.map(s=>s.url)).size<MIN_WEEKLY_FEATURE_SOURCES)errors.push("서로 다른 원문 3개 미만");
+  const normalize=(s:string)=>s.normalize("NFKC").replace(/\s+/g," ").trim();
+  for(const source of evidence){
+    const proof=check.sources.filter(s=>s.id===source.id);
+    if(proof.length!==1 || normalize(proof[0].quote).length<12 ||
+      !normalize(source.bodyText).includes(normalize(proof[0].quote)))errors.push("원문 확인 구절 불일치: "+source.id);
+  }
+  if(check.sources.some(s=>!evidence.some(e=>e.id===s.id)))errors.push("허위 출처 ID");
+  return errors;
 }

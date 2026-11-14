@@ -14,6 +14,7 @@ export async function handleWeeklyFeatureCron(
   }
 
   const dryRun = new URL(req.url).searchParams.get("dryRun") === "1";
+  if (!dryRun && process.env.VERCEL_ENV === "preview") return Response.json({error:"preview is read-only"},{status:409});
   try {
     const result = await runWeeklyGyeonggiFeature({ attempt, dryRun });
     return Response.json(result, { status: result.status === "hold" ? 422 : 200 });

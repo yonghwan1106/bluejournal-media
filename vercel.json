@@ -32,6 +32,14 @@
     {
       "path": "/api/cron/weekly-gyeonggi-feature/retry",
       "schedule": "0,30 23 * * 5"
+    },
+    {
+      "path": "/api/cron/world-local/prepare",
+      "schedule": "0 22 * * 2"
+    },
+    {
+      "path": "/api/cron/world-local/retry",
+      "schedule": "0,30 23 * * 2"
     }
   ]
 }
