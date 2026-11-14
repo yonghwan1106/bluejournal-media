@@ -661,7 +661,7 @@ test("AI Gateway 텍스트·RSI 라우팅은 공급자 다변화 폴백과 설�
   assert.match(weeklyFeatureAutomationSource, /WEEKLY_FEATURE_RSI_FALLBACK_MODELS/);
   assert.equal(
     weeklyFeatureAutomationSource.match(
-      /providerOptions:\s*\{\s*gateway:\s*routing\.gatewayOptions\s*\}/g,
+      /providerOptions:\s*\{\s*gateway:\s*routing\.gatewayOptions\b/g,
     )?.length,
     3,
     "주제·기사·수정 생성 호출은 Gateway 모델 폴백을 사용해야 한다",

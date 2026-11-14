@@ -5,6 +5,7 @@ async function main(){
    ["world",()=>runWorldLocal({attempt:"prepare",dryRun:true})],
    ["weekly",()=>runWeeklyGyeonggiFeature({attempt:"prepare",dryRun:true})]
  ] as const){
+  if(process.env.EDITORIAL_VERIFY_ONLY && process.env.EDITORIAL_VERIFY_ONLY!==name)continue;
   console.log("EDITORIAL_SMOKE_START "+name);
   try{
    const result=await run();
