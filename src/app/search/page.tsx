@@ -21,7 +21,8 @@ export default async function SearchPage({
 }) {
   const sp = await searchParams;
   const q = (sp.q ?? "").toString().trim();
-  const results = q ? await searchArticles(q) : [];
+  // 1글자 검색은 DB 부하 대비 효용이 낮아 조회하지 않는다(Neon 컴퓨트 상시 가동 방지).
+  const results = q.length >= 2 ? await searchArticles(q) : [];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -41,7 +42,11 @@ export default async function SearchPage({
         </button>
       </form>
 
-      {q && (
+      {q.length === 1 && (
+        <p className="mt-5 text-sm text-muted">검색어를 2글자 이상 입력하세요.</p>
+      )}
+
+      {q.length >= 2 && (
         <p className="mt-5 text-sm text-muted">
           <strong className="text-ink">{q}</strong> 검색결과 {results.length}건
         </p>
@@ -51,7 +56,7 @@ export default async function SearchPage({
         {results.map((a) => (
           <ArticleCard key={a.id} a={a} variant="row" />
         ))}
-        {q && results.length === 0 && (
+        {q.length >= 2 && results.length === 0 && (
           <p className="py-10 text-center text-muted">검색 결과가 없습니다.</p>
         )}
       </div>
